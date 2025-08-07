@@ -1,9 +1,8 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Cryptocurrency extends Model
 {
@@ -16,25 +15,23 @@ class Cryptocurrency extends Model
         'image',
         'current_price_usd',
         'current_price_pln',
-        'market_cap',
-        'market_cap_rank',
         'price_change_24h',
-        'price_change_percentage_24h',
         'last_updated',
     ];
 
-    protected $casts = [
-        'current_price_usd' => 'decimal:8',
-        'current_price_pln' => 'decimal:8',
-        'market_cap' => 'decimal:2',
-        'price_change_24h' => 'decimal:4',
-        'price_change_percentage_24h' => 'decimal:4',
-        'last_updated' => 'datetime',
-    ];
-
-    public function portfolios()
+    protected function casts(): array
     {
-        return $this->hasMany(Portfolio::class);
+        return [
+            'current_price_usd' => 'decimal:8',
+            'current_price_pln' => 'decimal:8',
+            'price_change_24h' => 'decimal:2',
+            'last_updated' => 'datetime',
+        ];
+    }
+
+    public function portfolioHoldings()
+    {
+        return $this->hasMany(PortfolioHolding::class);
     }
 
     public function priceAlerts()
@@ -45,10 +42,5 @@ class Cryptocurrency extends Model
     public function trendAnalyses()
     {
         return $this->hasMany(TrendAnalysis::class);
-    }
-
-    public function getLatestTrendAnalysis()
-    {
-        return $this->trendAnalyses()->latest()->first();
     }
 }

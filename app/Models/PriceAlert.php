@@ -1,9 +1,8 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class PriceAlert extends Model
 {
@@ -12,22 +11,21 @@ class PriceAlert extends Model
     protected $fillable = [
         'user_id',
         'cryptocurrency_id',
-        'alert_type',
+        'type',
         'target_price',
         'currency',
         'is_active',
-        'email_notification',
-        'push_notification',
         'triggered_at',
     ];
 
-    protected $casts = [
-        'target_price' => 'decimal:8',
-        'is_active' => 'boolean',
-        'email_notification' => 'boolean',
-        'push_notification' => 'boolean',
-        'triggered_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'target_price' => 'decimal:8',
+            'is_active' => 'boolean',
+            'triggered_at' => 'datetime',
+        ];
+    }
 
     public function user()
     {
@@ -39,7 +37,7 @@ class PriceAlert extends Model
         return $this->belongsTo(Cryptocurrency::class);
     }
 
-    public function shouldTrigger()
+    public function shouldTrigger(): bool
     {
         if (!$this->is_active || $this->triggered_at) {
             return false;
@@ -49,7 +47,10 @@ class PriceAlert extends Model
             ? $this->cryptocurrency->current_price_pln 
             : $this->cryptocurrency->current_price_usd;
 
-        return ($this->alert_type === 'above' && $currentPrice >= $this->target_price) ||
-               ($this->alert_type === 'below' && $currentPrice <= $this->target_price);
+        return match($this->type) {
+            'above' => $currentPrice >= $this->target_price,
+            'below' => $currentPrice <= $this->target_price,
+            default => false,
+        };
     }
 }

@@ -1,25 +1,18 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard')
-
 @section('content')
-<div class="dashboard">
-    <div class="container">
-        <div class="page-header">
-            <h1>Dashboard</h1>
-            <p>Witaj z powrotem, {{ auth()->user()->name }}!</p>
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>Witaj, {{ auth()->user()->name }}!</h1>
+        <div class="header-actions">
+            @if(!auth()->user()->isPremium())
+                <a href="#" class="btn btn-premium">Upgrade do Premium</a>
+            @endif
         </div>
+    </div>
 
-        <div id="dashboard-main">
-            <dashboard-component 
-                :portfolio-value="{{ $portfolioValue }}"
-                :portfolio-count="{{ $portfolioCount }}"
-                :alerts-count="{{ $alertsCount }}"
-                :top-cryptos="{{ $topCryptos->toJson() }}"
-                :trend-analyses="{{ $trendAnalyses->toJson() }}"
-                :is-premium="{{ auth()->user()->isPremium() ? 'true' : 'false' }}"
-            ></dashboard-component>
-        </div>
+    <div id="dashboard-vue">
+        <dashboard-component></dashboard-component>
     </div>
 </div>
 @endsection

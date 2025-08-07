@@ -1,25 +1,27 @@
 <?php
+// app/Models/User.php
+
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
+use App\Notifications\VerifyEmailNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'subscription_plan',
-        'subscription_expires_at',
-        'onesignal_player_id',
+        'premium',
+        'premium_expires_at',
+        'alerts_enabled',
         'email_notifications',
-        'push_notifications',
     ];
 
     protected $hidden = [
@@ -27,17 +29,21 @@ class User extends Authenticatable implements MustVerifyEmail
         'remember_token',
     ];
 
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'subscription_expires_at' => 'datetime',
-        'email_notifications' => 'boolean',
-        'push_notifications' => 'boolean',
-        'password' => 'hashed',
-    ];
-
-    public function portfolios()
+    protected function casts(): array
     {
-        return $this->hasMany(Portfolio::class);
+        return [
+            'email_verified_at' => 'datetime',
+            'premium_expires_at' => 'datetime',
+            'password' => 'hashed',
+            'premium' => 'boolean',
+            'alerts_enabled' => 'boolean',
+            'email_notifications' => 'boolean',
+        ];
+    }
+
+    public function portfolioHoldings()
+    {
+        return $this->hasMany(PortfolioHolding::class);
     }
 
     public function priceAlerts()
@@ -45,17 +51,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(PriceAlert::class);
     }
 
-    public function isPremium()
+    public function isPremium(): bool
     {
-        return $this->subscription_plan === 'premium' && 
-               $this->subscription_expires_at && 
-               $this->subscription_expires_at->isFuture();
+        return $this->premium && 
+               ($this->premium_expires_at === null || $this->premium_expires_at->isFuture());
     }
 
-    public function getTotalPortfolioValueAttribute()
+    public function getPortfolioValuePln(): float
     {
-        return $this->portfolios->sum(function ($portfolio) {
-            return $portfolio->amount * $portfolio->cryptocurrency->current_price_pln;
-        });
+        return $this->portfolioHoldings()
+            ->with('cryptocurrency')
+            ->get()
+            ->sum(function ($holding) {
+                return $holding->amount * $holding->cryptocurrency->current_price_pln;
+            });
+    }
+
+    // Custom email notifications
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new VerifyEmailNotification);
+    }
+
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 }

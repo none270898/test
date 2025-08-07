@@ -6,110 +6,118 @@ use Illuminate\Support\Facades\Log;
 
 class OneSignalService
 {
-    private $appId;
-    private $apiKey;
+    private ?string $appId;
+    private ?string $restApiKey;
+    private string $baseUrl = 'https://onesignal.com/api/v1';
 
     public function __construct()
     {
         $this->appId = config('services.onesignal.app_id');
-        $this->apiKey = config('services.onesignal.api_key');
-    }
-
-    public function sendToUser($userId, $title, $message, $data = [])
-    {
-        $user = \App\Models\User::find($userId);
+        $this->restApiKey = config('services.onesignal.rest_api_key');
         
-        if (!$user || !$user->onesignal_player_id || !$user->push_notifications) {
+        // Debug logging
+        Log::info('OneSignal Service initialized', [
+            'app_id_set' => !empty($this->appId),
+            'rest_api_key_set' => !empty($this->restApiKey),
+            'app_id_length' => $this->appId ? strlen($this->appId) : 0,
+        ]);
+    }
+
+    public function sendNotification(array $data): bool
+    {
+        Log::info('OneSignal sendNotification called', ['data' => $data]);
+        
+        if (!$this->appId || !$this->restApiKey) {
+            Log::warning('OneSignal not configured properly', [
+                'app_id_set' => !empty($this->appId),
+                'rest_api_key_set' => !empty($this->restApiKey)
+            ]);
             return false;
         }
 
-        return $this->sendNotification([
-            'include_player_ids' => [$user->onesignal_player_id],
-            'headings' => ['en' => $title, 'pl' => $title],
-            'contents' => ['en' => $message, 'pl' => $message],
-            'data' => $data,
-            'url' => config('app.url') . '/dashboard',
-        ]);
-    }
-
-    public function sendToUsers($userIds, $title, $message, $data = [])
-    {
-        $users = \App\Models\User::whereIn('id', $userIds)
-            ->whereNotNull('onesignal_player_id')
-            ->where('push_notifications', true)
-            ->get();
-
-        if ($users->isEmpty()) {
-            return false;
-        }
-
-        $playerIds = $users->pluck('onesignal_player_id')->toArray();
-
-        return $this->sendNotification([
-            'include_player_ids' => $playerIds,
-            'headings' => ['en' => $title, 'pl' => $title],
-            'contents' => ['en' => $message, 'pl' => $message],
-            'data' => $data,
-            'url' => config('app.url') . '/dashboard',
-        ]);
-    }
-
-    public function sendToSegment($segment, $title, $message, $data = [])
-    {
-        return $this->sendNotification([
-            'included_segments' => [$segment],
-            'headings' => ['en' => $title, 'pl' => $title],
-            'contents' => ['en' => $message, 'pl' => $message],
-            'data' => $data,
-            'url' => config('app.url') . '/dashboard',
-        ]);
-    }
-
-    private function sendNotification($params)
-    {
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Basic ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://onesignal.com/api/v1/notifications', array_merge([
+            $payload = array_merge($data, [
                 'app_id' => $this->appId,
-            ], $params));
+            ]);
+            
+            Log::info('OneSignal API request payload', ['payload' => $payload]);
 
-            if ($response->successful()) {
-                Log::info('OneSignal notification sent successfully', $response->json());
-                return true;
-            } else {
-                Log::error('OneSignal notification failed', [
-                    'status' => $response->status(),
-                    'response' => $response->json()
-                ]);
-                return false;
-            }
-
-        } catch (\Exception $e) {
-            Log::error('OneSignal service error: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    public function createUser($email, $userId)
-    {
-        try {
             $response = Http::withHeaders([
-                'Authorization' => 'Basic ' . $this->apiKey,
+                'Authorization' => 'Basic ' . $this->restApiKey,
                 'Content-Type' => 'application/json',
-            ])->post('https://onesignal.com/api/v1/players', [
-                'app_id' => $this->appId,
-                'device_type' => 5, // Web Push
-                'identifier' => $email,
-                'external_user_id' => $userId,
+            ])->post($this->baseUrl . '/notifications', $payload);
+
+            Log::info('OneSignal API response', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'successful' => $response->successful(),
             ]);
 
-            return $response->successful() ? $response->json() : null;
+            if ($response->successful()) {
+                Log::info('OneSignal notification sent successfully', ['response' => $response->json()]);
+                return true;
+            }
+
+            Log::error('OneSignal notification failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'headers' => $response->headers(),
+            ]);
+            return false;
 
         } catch (\Exception $e) {
-            Log::error('OneSignal create user error: ' . $e->getMessage());
-            return null;
+            Log::error('OneSignal notification exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return false;
         }
+    }
+
+    public function sendToUser(string $userId, array $notification): bool
+    {
+        Log::info('OneSignal sendToUser called', [
+            'user_id' => $userId,
+            'notification' => $notification
+        ]);
+        
+        return $this->sendNotification(array_merge($notification, [
+            'filters' => [
+                ['field' => 'tag', 'key' => 'user_id', 'relation' => '=', 'value' => $userId]
+            ]
+        ]));
+    }
+    
+    public function sendToAll(array $notification): bool
+    {
+        Log::info('OneSignal sendToAll called', ['notification' => $notification]);
+        
+        return $this->sendNotification(array_merge($notification, [
+            'included_segments' => ['All']
+        ]));
+    }
+    
+    // Test method
+    public function sendTestNotification(): bool
+    {
+        Log::info('OneSignal test notification triggered');
+        
+        $testNotification = [
+            'contents' => [
+                'en' => 'Test notification from CryptoNote.pl',
+                'pl' => 'Testowa notyfikacja z CryptoNote.pl'
+            ],
+            'headings' => [
+                'en' => 'Test Notification',
+                'pl' => 'Testowa Notyfikacja'
+            ],
+            'included_segments' => ['All'],
+            'data' => [
+                'type' => 'test',
+                'timestamp' => now()->toISOString(),
+            ],
+        ];
+        
+        return $this->sendNotification($testNotification);
     }
 }

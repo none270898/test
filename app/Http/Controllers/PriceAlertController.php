@@ -1,92 +1,94 @@
 <?php
+// app/Http/Controllers/PriceAlertController.php
 
 namespace App\Http\Controllers;
 
-use App\Models\Cryptocurrency;
 use App\Models\PriceAlert;
+use App\Models\Cryptocurrency;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class PriceAlertController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-
     public function index()
     {
-        $alerts = auth()->user()->priceAlerts()->with('cryptocurrency')->get();
-        $cryptocurrencies = Cryptocurrency::orderBy('name')->get();
-        
-        return view('alerts.index', compact('alerts', 'cryptocurrencies'));
+        $alerts = Auth::user()->priceAlerts()
+            ->with('cryptocurrency')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($alerts);
     }
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'cryptocurrency_id' => 'required|exists:cryptocurrencies,id',
-            'alert_type' => 'required|in:above,below',
-            'target_price' => 'required|numeric|min:0.00000001',
-            'currency' => 'required|in:PLN,USD',
-            'email_notification' => 'boolean',
-            'push_notification' => 'boolean',
+        $request->validate([
+            'cryptocurrency_id' => ['required', 'exists:cryptocurrencies,id'],
+            'type' => ['required', 'in:above,below'],
+            'target_price' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', 'in:PLN,USD'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $alert = PriceAlert::create([
-            'user_id' => auth()->id(),
+        $alert = Auth::user()->priceAlerts()->create([
             'cryptocurrency_id' => $request->cryptocurrency_id,
-            'alert_type' => $request->alert_type,
+            'type' => $request->type,
             'target_price' => $request->target_price,
             'currency' => $request->currency,
-            'email_notification' => $request->boolean('email_notification', true),
-            'push_notification' => $request->boolean('push_notification', true),
+            'is_active' => true,
         ]);
 
         return response()->json([
-            'success' => true,
+            'message' => 'Alert utworzony pomyślnie',
             'alert' => $alert->load('cryptocurrency')
-        ]);
+        ], 201);
     }
 
     public function update(Request $request, PriceAlert $alert)
     {
-        $this->authorize('update', $alert);
-
-        $validator = Validator::make($request->all(), [
-            'target_price' => 'required|numeric|min:0.00000001',
-            'email_notification' => 'boolean',
-            'push_notification' => 'boolean',
-            'is_active' => 'boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+        // Check ownership
+        if ($alert->user_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $alert->update($request->only([
-            'target_price', 
-            'email_notification', 
-            'push_notification', 
-            'is_active'
-        ]));
+        $request->validate([
+            'type' => ['sometimes', 'in:above,below'],
+            'target_price' => ['sometimes', 'numeric', 'min:0'],
+            'currency' => ['sometimes', 'in:PLN,USD'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $alert->update($request->only(['type', 'target_price', 'currency', 'is_active']));
 
         return response()->json([
-            'success' => true,
+            'message' => 'Alert zaktualizowany pomyślnie',
             'alert' => $alert->load('cryptocurrency')
         ]);
     }
 
     public function destroy(PriceAlert $alert)
     {
-        $this->authorize('delete', $alert);
-        
+        // Check ownership
+        if ($alert->user_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $alert->delete();
 
-        return response()->json(['success' => true]);
+        return response()->json(['message' => 'Alert usunięty pomyślnie']);
+    }
+
+    public function toggle(PriceAlert $alert)
+    {
+        // Check ownership
+        if ($alert->user_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $alert->update(['is_active' => !$alert->is_active]);
+
+        return response()->json([
+            'message' => $alert->is_active ? 'Alert włączony' : 'Alert wyłączony',
+            'alert' => $alert->load('cryptocurrency')
+        ]);
     }
 }

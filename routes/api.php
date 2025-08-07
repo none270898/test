@@ -1,17 +1,27 @@
-<?php
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\CryptocurrencyController;
-use App\Http\Controllers\Api\PortfolioController as ApiPortfolioController;
 
-Route::prefix('v1')->group(function () {
-    // Public API routes
-    Route::get('/cryptocurrencies', [CryptocurrencyController::class, 'index']);
-    Route::get('/cryptocurrencies/{cryptocurrency}', [CryptocurrencyController::class, 'show']);
-    Route::get('/prices', [CryptocurrencyController::class, 'prices']);
+<?php
+// routes/api.php
+
+use App\Http\Controllers\CryptocurrencyController;
+use App\Http\Controllers\PortfolioController;
+use App\Http\Controllers\PriceAlertController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth', 'verified'])->group(function () {
+    // Portfolio routes - explicit routes instead of apiResource
+    Route::get('portfolio', [PortfolioController::class, 'index']);
+    Route::post('portfolio', [PortfolioController::class, 'store']);
+    Route::put('portfolio/{holding}', [PortfolioController::class, 'update']);
+    Route::delete('portfolio/{holding}', [PortfolioController::class, 'destroy']);
     
-    // Protected API routes
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/portfolio', [ApiPortfolioController::class, 'index']);
-        Route::get('/portfolio/summary', [ApiPortfolioController::class, 'summary']);
-    });
+    // Price Alerts routes
+    Route::get('alerts', [PriceAlertController::class, 'index']);
+    Route::post('alerts', [PriceAlertController::class, 'store']);
+    Route::put('alerts/{alert}', [PriceAlertController::class, 'update']);
+    Route::delete('alerts/{alert}', [PriceAlertController::class, 'destroy']);
+    Route::post('alerts/{alert}/toggle', [PriceAlertController::class, 'toggle']);
+    
+    // Cryptocurrency routes
+    Route::get('cryptocurrencies', [CryptocurrencyController::class, 'index']);
+    Route::get('cryptocurrencies/search', [CryptocurrencyController::class, 'search']);
 });

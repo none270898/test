@@ -8,38 +8,39 @@ class Kernel extends ConsoleKernel
 {
     protected $commands = [
         Commands\UpdateCryptoPrices::class,
-        Commands\CheckAlerts::class,
-        Commands\ScrapeSentiment::class,
-        Commands\AnalyzeTrend::class,
+        Commands\CheckPriceAlerts::class,
+        Commands\UpdatePortfolioStats::class,
     ];
 
-    protected function schedule(Schedule $schedule)
+    protected function schedule(Schedule $schedule): void
     {
-        // Update cryptocurrency prices every 5 minutes
-        $schedule->command('crypto:update-prices')->everyFiveMinutes();
-        
+        // Update crypto prices every 5 minutes
+        $schedule->command('crypto:update-prices')
+                ->everyFiveMinutes()
+                ->withoutOverlapping();
+
         // Check price alerts every minute
-        $schedule->command('crypto:check-alerts')->everyMinute();
-        
-        // Scrape sentiment data every 30 minutes
-        $schedule->command('crypto:scrape-sentiment')->everyThirtyMinutes();
-        
-        // Analyze trends every hour
-        $schedule->command('crypto:analyze-trends')->hourly();
-        
-        // Send weekly reports on Sundays at 9 AM
-        $schedule->call(function () {
-            $users = \App\Models\User::where('email_notifications', true)
-                ->whereHas('portfolios')
-                ->get();
-            
-            foreach ($users as $user) {
-                app(\App\Services\NotificationService::class)->sendWeeklyReport($user);
-            }
-        })->weeklyOn(0, '9:00');
+        $schedule->command('crypto:check-alerts')
+                ->everyMinute()
+                ->withoutOverlapping();
+
+        // Update portfolio stats every 10 minutes
+        $schedule->command('crypto:update-portfolios')
+                ->everyTenMinutes()
+                ->withoutOverlapping();
+
+        // Scrape sentiment data every 30 minutes (Premium feature)
+        $schedule->job(new \App\Jobs\ScrapeSentimentData)
+                ->everyThirtyMinutes()
+                ->withoutOverlapping();
+
+        // Clean up old notifications (older than 30 days)
+        $schedule->command('model:prune', ['--model' => 'App\Models\Notification'])
+                ->daily()
+                ->at('02:00');
     }
 
-    protected function commands()
+    protected function commands(): void
     {
         $this->load(__DIR__.'/Commands');
 

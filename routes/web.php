@@ -1,56 +1,68 @@
 <?php
-use Illuminate\Support\Facades\Route;
+
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\Auth\ForgotPasswordController;
-use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\PortfolioController;
-use App\Http\Controllers\PriceAlertController;
-use App\Http\Controllers\TrendController;
-use App\Http\Controllers\SubscriptionController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/test-onesignal-send', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    
+    $oneSignalService = new \App\Services\OneSignalService();
+    
+    try {
+        $result = $oneSignalService->sendTestNotification();
+        
+        return response()->json([
+            'success' => $result,
+            'message' => $result ? 'Test notification sent!' : 'Failed to send notification',
+            'logs' => 'Check storage/logs/laravel.log for details'
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'message' => 'Exception occurred while sending test notification'
+        ]);
+    }
+})->name('test.onesignal.send');
+// Guest routes
+Route::middleware('guest')->group(function () {
+    Route::get('/register', [RegisterController::class, 'show'])->name('register');
+    Route::post('/register', [RegisterController::class, 'store']);
+    
+    Route::get('/login', [LoginController::class, 'show'])->name('login');
+    Route::post('/login', [LoginController::class, 'store']);
+    
+    Route::get('/forgot-password', [PasswordResetController::class, 'showLinkRequestForm'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLinkEmail'])->name('password.email');
+    
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.store');
+});
+
+// Authenticated routes
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+    
+    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
+    
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('verified')
+        ->name('dashboard');
+});
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
-
-// Authentication Routes
-Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [LoginController::class, 'login']);
-Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
-
-Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-Route::post('/register', [RegisterController::class, 'register']);
-
-Route::get('/password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
-Route::post('/password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
-Route::get('/password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
-Route::post('/password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
-
-// Protected Routes
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
-    // Portfolio
-    Route::get('/portfolio', [PortfolioController::class, 'index'])->name('portfolio.index');
-    Route::post('/portfolio', [PortfolioController::class, 'store'])->name('portfolio.store');
-    Route::put('/portfolio/{portfolio}', [PortfolioController::class, 'update'])->name('portfolio.update');
-    Route::delete('/portfolio/{portfolio}', [PortfolioController::class, 'destroy'])->name('portfolio.destroy');
-    
-    // Price Alerts
-    Route::get('/alerts', [PriceAlertController::class, 'index'])->name('alerts.index');
-    Route::post('/alerts', [PriceAlertController::class, 'store'])->name('alerts.store');
-    Route::put('/alerts/{alert}', [PriceAlertController::class, 'update'])->name('alerts.update');
-    Route::delete('/alerts/{alert}', [PriceAlertController::class, 'destroy'])->name('alerts.destroy');
-    
-    // Subscription
-    Route::get('/subscription', [SubscriptionController::class, 'index'])->name('subscription.index');
-    Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade');
-    Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
-    
-    // Trends (Premium only)
-    Route::middleware('premium')->group(function () {
-        Route::get('/trends', [TrendController::class, 'index'])->name('trends.index');
-        Route::get('/trends/{cryptocurrency}', [TrendController::class, 'show'])->name('trends.show');
-    });
-});

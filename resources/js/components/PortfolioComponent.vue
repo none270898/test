@@ -1,138 +1,158 @@
+// resources/js/components/PortfolioComponent.vue
+
 <template>
-  <div class="portfolio-content">
-    <!-- Portfolio Summary -->
-    <div class="portfolio-summary">
-      <div class="summary-card">
-        <h3>Podsumowanie Portfolio</h3>
-        <div class="summary-stats">
-          <div class="stat">
-            <label>Całkowita wartość:</label>
-            <span class="value">{{ formatCurrency(totalValue) }}</span>
-          </div>
-          <div class="stat">
-            <label>Całkowity zysk/strata:</label>
-            <span class="value" :class="{ 'positive': totalProfitLoss > 0, 'negative': totalProfitLoss < 0 }">
-              {{ formatCurrency(totalProfitLoss) }} ({{ totalProfitLossPercentage.toFixed(2) }}%)
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add New Position -->
-    <div class="add-position-card">
-      <h3>Dodaj Nową Pozycję</h3>
-      <form @submit.prevent="addPosition" class="add-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Kryptowaluta</label>
-            <select v-model="newPosition.cryptocurrency_id" required class="form-control">
-              <option value="">Wybierz kryptowalutę</option>
-              <option v-for="crypto in cryptocurrencies" :key="crypto.id" :value="crypto.id">
-                {{ crypto.name }} ({{ crypto.symbol }})
-              </option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label>Ilość</label>
-            <input v-model="newPosition.amount" type="number" step="0.00000001" required class="form-control">
-          </div>
-          
-          <div class="form-group">
-            <label>Średnia cena zakupu (PLN)</label>
-            <input v-model="newPosition.average_buy_price" type="number" step="0.01" class="form-control">
-          </div>
-          
-          <div class="form-group">
-            <button type="submit" class="btn btn-primary" :disabled="loading">
-              {{ loading ? 'Dodawanie...' : 'Dodaj' }}
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-
-    <!-- Portfolio List -->
-    <div class="portfolio-list">
-      <h3>Twoje Pozycje</h3>
-      
-      <div v-if="portfolios.length === 0" class="empty-state">
-        <div class="empty-icon">📊</div>
-        <h4>Brak pozycji w portfolio</h4>
-        <p>Dodaj swoją pierwszą kryptowalutę aby rozpocząć śledzenie</p>
-      </div>
-      
-      <div v-else class="portfolio-table">
-        <div class="table-header">
-          <div class="col-crypto">Kryptowaluta</div>
-          <div class="col-amount">Ilość</div>
-          <div class="col-price">Cena Zakupu</div>
-          <div class="col-current">Aktualna Cena</div>
-          <div class="col-value">Wartość</div>
-          <div class="col-profit">Zysk/Strata</div>
-          <div class="col-actions">Akcje</div>
+  <div class="portfolio-component">
+    <!-- Add Holding Modal -->
+    <div v-if="showAddModal" class="modal-overlay" @click="closeAddModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>{{ editingHolding ? 'Edit Holding' : 'Add New Holding' }}</h3>
+          <button @click="closeAddModal" class="close-btn">&times;</button>
         </div>
         
-        <div v-for="portfolio in portfolios" :key="portfolio.id" class="table-row">
-          <div class="col-crypto">
-            <img :src="portfolio.cryptocurrency.image" :alt="portfolio.cryptocurrency.name" class="crypto-logo">
-            <div class="crypto-info">
-              <div class="crypto-name">{{ portfolio.cryptocurrency.name }}</div>
-              <div class="crypto-symbol">{{ portfolio.cryptocurrency.symbol }}</div>
+        <form @submit.prevent="saveHolding" class="add-holding-form">
+          <div class="form-group">
+            <label>Cryptocurrency</label>
+            <div class="crypto-search-container">
+              <input 
+                v-model="searchQuery"
+                @input="searchCryptocurrencies"
+                placeholder="Search for cryptocurrency..."
+                :disabled="editingHolding"
+                class="crypto-search"
+              />
+              <div v-if="searchResults.length > 0 && !editingHolding" class="search-results">
+                <div 
+                  v-for="crypto in searchResults" 
+                  :key="crypto.id"
+                  @click="selectCryptocurrency(crypto)"
+                  class="search-result-item"
+                >
+                  <img :src="crypto.image" :alt="crypto.name" class="crypto-icon-small">
+                  <span class="crypto-name">{{ crypto.name }}</span>
+                  <span class="crypto-symbol">{{ crypto.symbol.toUpperCase() }}</span>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div class="col-amount">
-            <input v-if="editingId === portfolio.id" 
-                   v-model="editForm.amount" 
-                   type="number" 
-                   step="0.00000001" 
-                   class="form-control-small">
-            <span v-else>{{ portfolio.amount }}</span>
+
+          <div class="form-group">
+            <label>Amount</label>
+            <input 
+              v-model="holdingForm.amount" 
+              type="number" 
+              step="0.00000001" 
+              min="0"
+              placeholder="0.00000000"
+              required
+            />
           </div>
-          
-          <div class="col-price">
-            <input v-if="editingId === portfolio.id" 
-                   v-model="editForm.average_buy_price" 
-                   type="number" 
-                   step="0.01" 
-                   class="form-control-small">
-            <span v-else>{{ formatCurrency(portfolio.average_buy_price) }}</span>
+
+          <div class="form-group">
+            <label>Average Buy Price (PLN) - Optional</label>
+            <input 
+              v-model="holdingForm.average_buy_price" 
+              type="number" 
+              step="0.01" 
+              min="0"
+              placeholder="0.00"
+            />
+            <small class="form-help">Leave empty if you don't want to track profit/loss</small>
           </div>
-          
-          <div class="col-current">
-            {{ formatCurrency(portfolio.cryptocurrency.current_price_pln) }}
-          </div>
-          
-          <div class="col-value">
-            {{ formatCurrency(portfolio.current_value) }}
-          </div>
-          
-          <div class="col-profit" :class="{ 'positive': portfolio.profit_loss > 0, 'negative': portfolio.profit_loss < 0 }">
-            <div>{{ formatCurrency(portfolio.profit_loss) }}</div>
-            <div class="small">{{ portfolio.profit_loss_percentage?.toFixed(2) }}%</div>
-          </div>
-          
-          <div class="col-actions">
-            <button v-if="editingId === portfolio.id" 
-                    @click="saveEdit(portfolio)" 
-                    class="btn btn-small btn-success">
-              Zapisz
+
+          <div class="form-actions">
+            <button type="button" @click="closeAddModal" class="btn btn-secondary">
+              Cancel
             </button>
-            <button v-if="editingId === portfolio.id" 
-                    @click="cancelEdit" 
-                    class="btn btn-small btn-secondary">
-              Anuluj
+            <button type="submit" :disabled="!selectedCrypto || loading" class="btn btn-primary">
+              <span v-if="loading">{{ editingHolding ? 'Updating...' : 'Adding...' }}</span>
+              <span v-else>{{ editingHolding ? 'Update Holding' : 'Add Holding' }}</span>
             </button>
-            <button v-else 
-                    @click="startEdit(portfolio)" 
-                    class="btn btn-small btn-secondary">
-              Edytuj
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Holdings List -->
+    <div class="holdings-container">
+      <div class="holdings-header">
+        <h3>Your Holdings</h3>
+        <button @click="showAddModal = true" class="btn btn-primary">
+          <span class="btn-icon">+</span>
+          Add Holding
+        </button>
+      </div>
+
+      <div v-if="loading && holdings.length === 0" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading your portfolio...</p>
+      </div>
+
+      <div v-else-if="holdings.length === 0" class="empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>No holdings yet</h3>
+        <p>Add your first cryptocurrency to start tracking your portfolio</p>
+        <button @click="showAddModal = true" class="btn btn-primary">
+          Add Your First Holding
+        </button>
+      </div>
+
+      <div v-else class="holdings-list">
+        <div 
+          v-for="holding in holdings" 
+          :key="holding.id"
+          class="holding-card"
+        >
+          <div class="holding-main">
+            <div class="crypto-info">
+              <img 
+                :src="holding.cryptocurrency.image" 
+                :alt="holding.cryptocurrency.name" 
+                class="crypto-icon"
+                @error="handleImageError"
+              >
+              <div class="crypto-details">
+                <h4>{{ holding.cryptocurrency.name }}</h4>
+                <span class="crypto-symbol">{{ holding.cryptocurrency.symbol.toUpperCase() }}</span>
+              </div>
+            </div>
+
+            <div class="holding-amounts">
+              <div class="amount-section">
+                <label>Amount</label>
+                <div class="amount-value">
+                  {{ formatAmount(holding.amount) }} {{ holding.cryptocurrency.symbol.toUpperCase() }}
+                </div>
+              </div>
+
+              <div class="value-section">
+                <label>Current Value</label>
+                <div class="current-value">
+                  {{ formatPLN(holding.amount * holding.cryptocurrency.current_price_pln) }}
+                </div>
+                <div class="price-per-unit">
+                  {{ formatPLN(holding.cryptocurrency.current_price_pln) }} per {{ holding.cryptocurrency.symbol.toUpperCase() }}
+                </div>
+              </div>
+
+              <div v-if="holding.average_buy_price" class="profit-section">
+                <label>Profit/Loss</label>
+                <div class="profit-value" :class="getProfitClass(holding)">
+                  {{ formatPLN(calculateProfit(holding)) }}
+                  <span class="profit-percent">
+                    ({{ formatPercent(calculateProfitPercent(holding)) }}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="holding-actions">
+            <button @click="editHolding(holding)" class="btn btn-small btn-secondary">
+              Edit
             </button>
-            <button @click="deletePosition(portfolio)" 
-                    class="btn btn-small btn-danger">
-              Usuń
+            <button @click="deleteHolding(holding)" class="btn btn-small btn-danger">
+              Delete
             </button>
           </div>
         </div>
@@ -144,151 +164,607 @@
 <script>
 export default {
   name: 'PortfolioComponent',
-  props: {
-    initialPortfolios: {
-      type: Array,
-      default: () => []
-    },
-    cryptocurrencies: {
-      type: Array,
-      default: () => []
-    }
-  },
-  
   data() {
     return {
-      portfolios: [...this.initialPortfolios],
+      holdings: [],
       loading: false,
-      editingId: null,
-      editForm: {},
-      newPosition: {
-        cryptocurrency_id: '',
+      showAddModal: false,
+      editingHolding: null,
+      selectedCrypto: null,
+      searchQuery: '',
+      searchResults: [],
+      searchTimeout: null,
+      holdingForm: {
         amount: '',
         average_buy_price: ''
       }
     }
   },
-  
-  computed: {
-    totalValue() {
-      return this.portfolios.reduce((sum, p) => sum + parseFloat(p.current_value || 0), 0);
-    },
-    
-    totalInvested() {
-      return this.portfolios.reduce((sum, p) => {
-        const invested = parseFloat(p.amount || 0) * parseFloat(p.average_buy_price || 0);
-        return sum + invested;
-      }, 0);
-    },
-    
-    totalProfitLoss() {
-      return this.totalValue - this.totalInvested;
-    },
-    
-    totalProfitLossPercentage() {
-      return this.totalInvested > 0 ? (this.totalProfitLoss / this.totalInvested) * 100 : 0;
-    }
+  async mounted() {
+    await this.loadHoldings();
   },
-  
   methods: {
-    async addPosition() {
+    async loadHoldings() {
       this.loading = true;
-      
       try {
-        const response = await axios.post('/portfolio', this.newPosition);
-        
-        if (response.data.success) {
-          // Update or add portfolio item
-          const existingIndex = this.portfolios.findIndex(p => p.id === response.data.portfolio.id);
-          if (existingIndex >= 0) {
-            this.portfolios[existingIndex] = response.data.portfolio;
-          } else {
-            this.portfolios.push(response.data.portfolio);
-          }
-          
-          // Reset form
-          this.newPosition = {
-            cryptocurrency_id: '',
-            amount: '',
-            average_buy_price: ''
-          };
-          
-          this.showSuccess('Pozycja została dodana!');
-        }
+        const response = await window.axios.get('/api/portfolio');
+        this.holdings = response.data.holdings;
+        this.$emit('portfolio-updated', response.data.portfolio_stats);
       } catch (error) {
-        this.showError('Błąd podczas dodawania pozycji');
-        console.error(error);
+        console.error('Error loading holdings:', error);
+        this.showError('Failed to load portfolio holdings');
       } finally {
         this.loading = false;
       }
     },
-    
-    startEdit(portfolio) {
-      this.editingId = portfolio.id;
-      this.editForm = {
-        amount: portfolio.amount,
-        average_buy_price: portfolio.average_buy_price
-      };
-    },
-    
-    cancelEdit() {
-      this.editingId = null;
-      this.editForm = {};
-    },
-    
-    async saveEdit(portfolio) {
-      try {
-        const response = await axios.put(`/portfolio/${portfolio.id}`, this.editForm);
-        
-        if (response.data.success) {
-          const index = this.portfolios.findIndex(p => p.id === portfolio.id);
-          if (index >= 0) {
-            this.portfolios[index] = response.data.portfolio;
-          }
-          
-          this.editingId = null;
-          this.editForm = {};
-          this.showSuccess('Pozycja została zaktualizowana!');
-        }
-      } catch (error) {
-        this.showError('Błąd podczas aktualizacji pozycji');
-        console.error(error);
-      }
-    },
-    
-    async deletePosition(portfolio) {
-      if (!confirm(`Czy na pewno chcesz usunąć ${portfolio.cryptocurrency.symbol} z portfolio?`)) {
+
+    async searchCryptocurrencies() {
+      if (this.searchQuery.length < 2) {
+        this.searchResults = [];
         return;
       }
-      
-      try {
-        const response = await axios.delete(`/portfolio/${portfolio.id}`);
-        
-        if (response.data.success) {
-          this.portfolios = this.portfolios.filter(p => p.id !== portfolio.id);
-          this.showSuccess('Pozycja została usunięta!');
+
+      clearTimeout(this.searchTimeout);
+      this.searchTimeout = setTimeout(async () => {
+        try {
+          const response = await window.axios.get('/api/cryptocurrencies/search', {
+            params: { q: this.searchQuery }
+          });
+          this.searchResults = response.data;
+        } catch (error) {
+          console.error('Search error:', error);
+          this.searchResults = [];
         }
+      }, 300);
+    },
+
+    selectCryptocurrency(crypto) {
+      this.selectedCrypto = crypto;
+      this.searchQuery = `${crypto.name} (${crypto.symbol.toUpperCase()})`;
+      this.searchResults = [];
+    },
+
+    async saveHolding() {
+      if (!this.selectedCrypto && !this.editingHolding) return;
+
+      this.loading = true;
+      try {
+        const data = {
+          cryptocurrency_id: this.editingHolding ? this.editingHolding.cryptocurrency_id : this.selectedCrypto.id,
+          amount: parseFloat(this.holdingForm.amount),
+          average_buy_price: this.holdingForm.average_buy_price ? parseFloat(this.holdingForm.average_buy_price) : null
+        };
+
+        if (this.editingHolding) {
+          await window.axios.put(`/api/portfolio/${this.editingHolding.id}`, data);
+          this.showSuccess('Holding updated successfully');
+        } else {
+          await window.axios.post('/api/portfolio', data);
+          this.showSuccess('Holding added successfully');
+        }
+
+        await this.loadHoldings();
+        this.closeAddModal();
       } catch (error) {
-        this.showError('Błąd podczas usuwania pozycji');
-        console.error(error);
+        console.error('Error saving holding:', error);
+        this.showError('Failed to save holding');
+      } finally {
+        this.loading = false;
       }
     },
-    
-    formatCurrency(value) {
-      return new Intl.NumberFormat('pl-PL', {
+
+    editHolding(holding) {
+      this.editingHolding = holding;
+      this.selectedCrypto = holding.cryptocurrency;
+      this.searchQuery = `${holding.cryptocurrency.name} (${holding.cryptocurrency.symbol.toUpperCase()})`;
+      this.holdingForm.amount = holding.amount.toString();
+      this.holdingForm.average_buy_price = holding.average_buy_price ? holding.average_buy_price.toString() : '';
+      this.showAddModal = true;
+    },
+
+    async deleteHolding(holding) {
+      if (!confirm(`Are you sure you want to delete your ${holding.cryptocurrency.name} holding?`)) {
+        return;
+      }
+
+      try {
+        await window.axios.delete(`/api/portfolio/${holding.id}`);
+        this.showSuccess('Holding deleted successfully');
+        await this.loadHoldings();
+      } catch (error) {
+        console.error('Error deleting holding:', error);
+        this.showError('Failed to delete holding');
+      }
+    },
+
+    closeAddModal() {
+      this.showAddModal = false;
+      this.editingHolding = null;
+      this.selectedCrypto = null;
+      this.searchQuery = '';
+      this.searchResults = [];
+      this.holdingForm = {
+        amount: '',
+        average_buy_price: ''
+      };
+    },
+
+    calculateProfit(holding) {
+      if (!holding.average_buy_price) return 0;
+      const currentValue = holding.amount * holding.cryptocurrency.current_price_pln;
+      const investedValue = holding.amount * holding.average_buy_price;
+      return currentValue - investedValue;
+    },
+
+    calculateProfitPercent(holding) {
+      if (!holding.average_buy_price) return 0;
+      const profit = this.calculateProfit(holding);
+      const investedValue = holding.amount * holding.average_buy_price;
+      return investedValue > 0 ? (profit / investedValue) * 100 : 0;
+    },
+
+    getProfitClass(holding) {
+      const profit = this.calculateProfit(holding);
+      if (profit > 0) return 'profit-positive';
+      if (profit < 0) return 'profit-negative';
+      return 'profit-neutral';
+    },
+
+    formatAmount(amount) {
+      return parseFloat(amount).toLocaleString('pl-PL', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 8
+      });
+    },
+
+    formatPLN(amount) {
+      return parseFloat(amount).toLocaleString('pl-PL', {
         style: 'currency',
         currency: 'PLN'
-      }).format(value || 0);
+      });
     },
-    
+
+    formatPercent(percent) {
+      return parseFloat(percent).toLocaleString('pl-PL', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        signDisplay: 'always'
+      });
+    },
+
+    handleImageError(event) {
+      event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2MzY2ZjEiLz4KPHR5cGU+4oKfPC90ZXh0Pgo8L3N2Zz4K';
+    },
+
     showSuccess(message) {
-      // Simple notification - you can integrate with a toast library
-      alert(message);
+      // You can implement toast notifications here
+      console.log('Success:', message);
     },
-    
+
     showError(message) {
-      alert(message);
+      // You can implement toast notifications here
+      console.error('Error:', message);
     }
   }
 }
 </script>
+
+<style scoped>
+.portfolio-component {
+  width: 100%;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem 2rem 0;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #64748b;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.add-holding-form {
+  padding: 0 2rem 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.crypto-search-container {
+  position: relative;
+}
+
+.crypto-search,
+.add-holding-form input[type="number"] {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.crypto-search:focus,
+.add-holding-form input[type="number"]:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: white;
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  gap: 0.75rem;
+}
+
+.search-result-item:hover {
+  background: #f8fafc;
+}
+
+.crypto-icon-small {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.crypto-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.crypto-symbol {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-left: auto;
+}
+
+.form-help {
+  display: block;
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.holdings-container {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.holdings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.holdings-header h3 {
+  color: #1e293b;
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+  gap: 0.5rem;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.btn-danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.btn-danger:hover {
+  background: #fee2e2;
+}
+
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.btn-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f4f6;
+  border-left: 4px solid #6366f1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #64748b;
+  margin-bottom: 2rem;
+}
+
+.holdings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.holding-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(248, 250, 252, 0.8));
+}
+
+.holding-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  border-color: #6366f1;
+}
+
+.holding-main {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.crypto-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 200px;
+}
+
+.crypto-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #f1f5f9;
+}
+
+.crypto-details h4 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.crypto-symbol {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.holding-amounts {
+  display: flex;
+  gap: 2rem;
+  flex: 1;
+}
+
+.amount-section,
+.value-section,
+.profit-section {
+  flex: 1;
+}
+
+.amount-section label,
+.value-section label,
+.profit-section label {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.amount-value,
+.current-value,
+.profit-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.price-per-unit {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.profit-positive {
+  color: #10b981;
+}
+
+.profit-negative {
+  color: #ef4444;
+}
+
+.profit-neutral {
+  color: #64748b;
+}
+
+.profit-percent {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.holding-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .holdings-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .holding-main {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .holding-amounts {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .crypto-info {
+    min-width: auto;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .holding-actions {
+    justify-content: stretch;
+  }
+}
+</style>

@@ -1,74 +1,96 @@
 <?php
 // app/Notifications/PriceAlertTriggered.php
+
 namespace App\Notifications;
 
+use App\Models\PriceAlert;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Services\OneSignalService;
-use App\Models\PriceAlert;
 
 class PriceAlertTriggered extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    private $alert;
-
-    public function __construct(PriceAlert $alert)
+    public function __construct(private PriceAlert $alert)
     {
-        $this->alert = $alert;
     }
 
-    public function via($notifiable)
+    public function via($notifiable): array
     {
         $channels = [];
         
-        if ($this->alert->email_notification && $notifiable->email_notifications) {
+        if ($notifiable->email_notifications) {
             $channels[] = 'mail';
         }
         
-        if ($this->alert->push_notification && $notifiable->push_notifications) {
-            $channels[] = 'database';
+        // Add OneSignal if configured
+        if (config('services.onesignal.app_id') && config('services.onesignal.rest_api_key')) {
+            $channels[] = 'onesignal';
         }
         
         return $channels;
     }
 
-    public function toMail($notifiable)
+    public function toMail($notifiable): MailMessage
     {
         $crypto = $this->alert->cryptocurrency;
         $currentPrice = $this->alert->currency === 'PLN' 
             ? $crypto->current_price_pln 
             : $crypto->current_price_usd;
 
+        $direction = $this->alert->type === 'above' ? 'wzrosła powyżej' : 'spadła poniżej';
+        $currency = $this->alert->currency;
+        
         return (new MailMessage)
-            ->subject("Alert cenowy: {$crypto->symbol}")
-            ->greeting("Witaj {$notifiable->name}!")
-            ->line("Twój alert cenowy został uruchomiony!")
-            ->line("**{$crypto->name} ({$crypto->symbol})**")
-            ->line("Aktualna cena: **{$currentPrice} {$this->alert->currency}**")
-            ->line("Cena docelowa: {$this->alert->target_price} {$this->alert->currency}")
-            ->line("Typ alertu: " . ($this->alert->alert_type === 'above' ? 'Powyżej' : 'Poniżej'))
-            ->action('Zobacz portfolio', url('/portfolio'))
-            ->line('Dziękujemy za używanie CryptoNote.pl!');
+            ->subject("🚨 Alert cenowy: {$crypto->name}")
+            ->view('emails.price-alert-triggered', [
+                'user' => $notifiable,
+                'alert' => $this->alert,
+                'crypto' => $crypto,
+                'currentPrice' => $currentPrice,
+                'direction' => $direction,
+                'currency' => $currency,
+            ]);
     }
 
-    public function toArray($notifiable)
+    public function toOneSignal($notifiable): array
     {
         $crypto = $this->alert->cryptocurrency;
         $currentPrice = $this->alert->currency === 'PLN' 
             ? $crypto->current_price_pln 
             : $crypto->current_price_usd;
 
+        $direction = $this->alert->type === 'above' ? 'wzrosła powyżej' : 'spadła poniżej';
+        $currency = $this->alert->currency;
+        
+        return [
+            'contents' => [
+                'pl' => "Cena {$crypto->name} {$direction} {$this->alert->target_price} {$currency}. Aktualna cena: " . number_format($currentPrice, 2) . " {$currency}"
+            ],
+            'headings' => [
+                'pl' => "🚨 Alert cenowy: {$crypto->name}"
+            ],
+            'data' => [
+                'type' => 'price_alert',
+                'cryptocurrency' => $crypto->symbol,
+                'price' => $currentPrice,
+            ],
+            'web_url' => route('dashboard'),
+        ];
+    }
+
+    public function toArray($notifiable): array
+    {
         return [
             'type' => 'price_alert',
-            'title' => "Alert cenowy: {$crypto->symbol}",
-            'message' => $crypto->symbol . ' ' .( $this->alert->alert_type === 'above' ? 'powyżej' : 'poniżej') . $currentPrice. ' ' . $this->alert->currency,
-            'alert_id' => $this->alert->id,
-            'cryptocurrency_id' => $crypto->id,
-            'current_price' => $currentPrice,
+            'cryptocurrency_id' => $this->alert->cryptocurrency_id,
+            'alert_type' => $this->alert->type,
             'target_price' => $this->alert->target_price,
+            'current_price' => $this->alert->currency === 'PLN' 
+                ? $this->alert->cryptocurrency->current_price_pln 
+                : $this->alert->cryptocurrency->current_price_usd,
             'currency' => $this->alert->currency,
         ];
     }

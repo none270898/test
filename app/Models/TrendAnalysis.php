@@ -1,9 +1,8 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class TrendAnalysis extends Model
 {
@@ -15,37 +14,30 @@ class TrendAnalysis extends Model
         'mention_count',
         'trend_direction',
         'confidence_score',
-        'source_breakdown',
         'analysis_period_start',
         'analysis_period_end',
     ];
 
-    protected $casts = [
-        'sentiment_avg' => 'decimal:2',
-        'source_breakdown' => 'array',
-        'analysis_period_start' => 'datetime',
-        'analysis_period_end' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'sentiment_avg' => 'decimal:2',
+            'analysis_period_start' => 'datetime',
+            'analysis_period_end' => 'datetime',
+        ];
+    }
 
     public function cryptocurrency()
     {
         return $this->belongsTo(Cryptocurrency::class);
     }
 
-    public function getTrendEmoji()
+    public function getTrendEmoji(): string
     {
         return match($this->trend_direction) {
             'up' => '📈',
             'down' => '📉',
-            default => '➡️'
+            default => '➡️',
         };
-    }
-
-    public function getConfidenceLabel()
-    {
-        if ($this->confidence_score >= 80) return 'Bardzo wysoka';
-        if ($this->confidence_score >= 60) return 'Wysoka';
-        if ($this->confidence_score >= 40) return 'Średnia';
-        return 'Niska';
     }
 }

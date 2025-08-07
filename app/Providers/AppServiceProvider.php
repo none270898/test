@@ -3,22 +3,26 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Gate;
-use App\Models\Portfolio;
-use App\Models\PriceAlert;
-use App\Policies\PortfolioPolicy;
-use App\Policies\PriceAlertPolicy;
-
+use App\Channels\OneSignalChannel;
+use App\Services\OneSignalService;
+use Illuminate\Support\Facades\Notification;
 class AppServiceProvider extends ServiceProvider
 {
-    public function register()
+    /**
+     * Register any application services.
+     */
+    public function register(): void
     {
         //
     }
 
-    public function boot()
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
     {
-        Gate::policy(Portfolio::class, PortfolioPolicy::class);
-        Gate::policy(PriceAlert::class, PriceAlertPolicy::class);
+        Notification::extend('onesignal', function () {
+        return new OneSignalChannel(new OneSignalService());
+    });
     }
 }

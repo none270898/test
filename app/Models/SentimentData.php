@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SentimentData extends Model
 {
@@ -12,23 +12,19 @@ class SentimentData extends Model
     protected $fillable = [
         'source',
         'content',
-        'url',
         'sentiment_score',
         'keywords',
-        'language',
+        'source_url',
+        'author',
         'published_at',
     ];
 
-    protected $casts = [
-        'sentiment_score' => 'decimal:2',
-        'keywords' => 'array',
-        'published_at' => 'datetime',
-    ];
-
-    public function getSentimentLabelAttribute()
+    protected function casts(): array
     {
-        if ($this->sentiment_score > 0.3) return 'positive';
-        if ($this->sentiment_score < -0.3) return 'negative';
-        return 'neutral';
+        return [
+            'keywords' => 'array',
+            'sentiment_score' => 'decimal:2',
+            'published_at' => 'datetime',
+        ];
     }
 }

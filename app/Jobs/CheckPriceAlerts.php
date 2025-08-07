@@ -14,28 +14,42 @@ class CheckPriceAlerts implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle()
+    public function handle(): void
+    {
+        Log::info('Checking price alerts...');
+
+        $activeAlerts = PriceAlert::with(['cryptocurrency', 'user'])
+            ->where('is_active', true)
+            ->whereNull('triggered_at')
+            ->get();
+
+        $triggeredCount = 0;
+
+        foreach ($activeAlerts as $alert) {
+            if ($alert->shouldTrigger()) {
+                $this->triggerAlert($alert);
+                $triggeredCount++;
+            }
+        }
+
+        Log::info("Price alerts check completed. Triggered: {$triggeredCount}");
+    }
+
+    private function triggerAlert(PriceAlert $alert): void
     {
         try {
-            $alerts = PriceAlert::where('is_active', true)
-                ->whereNull('triggered_at')
-                ->with(['user', 'cryptocurrency'])
-                ->get();
+            // Mark as triggered
+            $alert->update([
+                'triggered_at' => now(),
+                'is_active' => false, // Deactivate after triggering
+            ]);
 
-            foreach ($alerts as $alert) {
-                if ($alert->shouldTrigger()) {
-                    // Oznacz alert jako uruchomiony
-                    $alert->update(['triggered_at' => now()]);
-                    
-                    // Wyślij powiadomienie
-                    $alert->user->notify(new PriceAlertTriggered($alert));
-                    
-                    Log::info("Price alert triggered for user {$alert->user->id}: {$alert->cryptocurrency->symbol}");
-                }
-            }
+            // Send notification
+            $alert->user->notify(new PriceAlertTriggered($alert));
 
+            Log::info("Alert triggered for user {$alert->user->id}: {$alert->cryptocurrency->name}");
         } catch (\Exception $e) {
-            Log::error('Error checking price alerts: ' . $e->getMessage());
+            Log::error("Failed to trigger alert {$alert->id}: " . $e->getMessage());
         }
     }
 }

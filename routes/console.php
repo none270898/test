@@ -1,8 +1,7 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Schedule::command('crypto:update-prices')->everyFiveMinutes();
+Schedule::command('crypto:sync-coins --pages=1')->daily();
+Schedule::command('alerts:check')->everyMinute();
