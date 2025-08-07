@@ -1,41 +1,18 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-            appId: "{{ config('services.onesignal.app_id') }}",
-            safari_web_id: "web.onesignal.auto.{{ config('services.onesignal.app_id') }}",
-            notifyButton: {
-                enable: false, // Wyłączamy domyślny przycisk
-            },
-            allowLocalhostAsSecureOrigin: true, // Dla developmentu
-        });
-
-        // Sprawdź czy użytkownik jest zalogowany
-        @auth
-        // Tag użytkownika dla targetowanych notyfikacji
-        OneSignal.User.addTag("user_id", "{{ auth()->id() }}");
-        OneSignal.User.addTag("user_email", "{{ auth()->user()->email }}");
-
-        console.log('OneSignal initialized for user {{ auth()->id() }}');
-    @endauth
-
-    // Event listeners
-    OneSignal.Notifications.addEventListener('click', function(event) {
-        console.log('OneSignal notification clicked:', event);
-
-        // Redirect to dashboard if it's a price alert
-        if (event.notification.additionalData && event.notification.additionalData.type === 'price_alert') {
-            window.location.href = '{{ route('dashboard') }}';
-        }
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "2b01ec1e-7c15-40ea-965e-a42901074970",
+      safari_web_id: "web.onesignal.auto.458f9dc8-6677-4788-b5a2-9d66a9d7a179",
+      notifyButton: {
+        enable: true,
+      },
     });
-
-    OneSignal.User.PushSubscription.addEventListener('change', function(event) {
-        console.log('OneSignal subscription changed:', event);
-    });
-    });
+  });
 </script>
 
 <head>
