@@ -269,9 +269,9 @@ class SentimentAnalysisService
     {
         $watchlistCryptos = $user->getWatchlistCryptos();
         
-        if ($watchlistCryptos->isEmpty()) {
-            return [];
-        }
+        // if ($watchlistCryptos->isEmpty()) {
+        //     return [];
+        // }
 
         $cryptoIds = $watchlistCryptos->pluck('id')->toArray();
         

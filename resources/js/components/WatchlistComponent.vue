@@ -8,9 +8,12 @@
           <span class="btn-icon">+</span>
           Add Crypto
         </button>
-        <button @click="showDiscovery = !showDiscovery" class="btn btn-secondary">
+        <button
+          @click="showDiscovery = !showDiscovery"
+          class="btn btn-secondary"
+        >
           <span class="btn-icon">🔍</span>
-          {{ showDiscovery ? 'Hide' : 'Discover' }}
+          {{ showDiscovery ? "Hide" : "Discover" }}
         </button>
       </div>
     </div>
@@ -30,15 +33,18 @@
       <div v-else-if="watchlist.length === 0" class="empty-state">
         <div class="empty-icon">🎯</div>
         <h3>Your watchlist is empty</h3>
-        <p>Add cryptocurrencies to track their sentiment and get personalized insights</p>
+        <p>
+          Add cryptocurrencies to track their sentiment and get personalized
+          insights
+        </p>
         <button @click="initializeDefaultWatchlist" class="btn btn-primary">
           Add Popular Cryptos
         </button>
       </div>
 
       <div v-else class="watchlist-grid">
-        <div 
-          v-for="item in watchlist" 
+        <div
+          v-for="item in watchlist"
           :key="item.cryptocurrency.id"
           class="watchlist-card"
           :class="getWatchlistCardClass(item)"
@@ -46,28 +52,30 @@
           <!-- Card Header -->
           <div class="card-header">
             <div class="crypto-info">
-              <img 
-                :src="item.cryptocurrency.image" 
-                :alt="item.cryptocurrency.name" 
+              <img
+                :src="item.cryptocurrency.image"
+                :alt="item.cryptocurrency.name"
                 class="crypto-icon"
                 @error="handleImageError"
-              >
+              />
               <div class="crypto-details">
                 <h4>{{ item.cryptocurrency.name }}</h4>
-                <span class="crypto-symbol">{{ item.cryptocurrency.symbol.toUpperCase() }}</span>
+                <span class="crypto-symbol">{{
+                  item.cryptocurrency.symbol.toUpperCase()
+                }}</span>
               </div>
             </div>
-            
+
             <div class="card-actions">
-              <button 
-                @click="showCryptoHistory(item.cryptocurrency)" 
+              <button
+                @click="showCryptoHistory(item.cryptocurrency)"
                 class="btn btn-small btn-ghost"
                 title="View History"
               >
                 📈
               </button>
-              <button 
-                @click="removeCrypto(item)" 
+              <button
+                @click="removeCrypto(item)"
                 class="btn btn-small btn-ghost btn-danger"
                 title="Remove from Watchlist"
               >
@@ -81,7 +89,10 @@
             <div class="current-price">
               {{ formatPLN(item.cryptocurrency.current_price_pln) }}
             </div>
-            <div class="price-change" :class="getPriceChangeClass(item.cryptocurrency.price_change_24h)">
+            <div
+              class="price-change"
+              :class="getPriceChangeClass(item.cryptocurrency.price_change_24h)"
+            >
               {{ formatPercent(item.cryptocurrency.price_change_24h) }}% 24h
             </div>
           </div>
@@ -92,7 +103,10 @@
               <label>Sentiment</label>
               <div class="sentiment-value">
                 <span class="sentiment-emoji">{{ item.emoji }}</span>
-                <span class="sentiment-score" :class="getSentimentClass(item.sentiment_avg)">
+                <span
+                  class="sentiment-score"
+                  :class="getSentimentClass(item.sentiment_avg)"
+                >
                   {{ formatSentiment(item.sentiment_avg) }}
                 </span>
               </div>
@@ -112,7 +126,10 @@
             <!-- Sentiment Change -->
             <div v-if="item.sentiment_change !== 0" class="sentiment-change">
               <span class="change-label">24h change:</span>
-              <span class="change-value" :class="getSentimentClass(item.sentiment_change)">
+              <span
+                class="change-value"
+                :class="getSentimentClass(item.sentiment_change)"
+              >
                 {{ formatSentimentChange(item.sentiment_change) }}
               </span>
             </div>
@@ -123,11 +140,11 @@
             <span class="update-time">{{ item.analysis_time }}</span>
             <div class="notification-toggle">
               <label class="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  :checked="item.notifications_enabled" 
+                <input
+                  type="checkbox"
+                  :checked="item.notifications_enabled"
                   @change="toggleNotifications(item, $event)"
-                >
+                />
                 <span class="toggle-slider"></span>
               </label>
               <span class="toggle-label">Alerts</span>
@@ -144,41 +161,53 @@
           <h3>Add to Watchlist</h3>
           <button @click="closeAddModal" class="close-btn">&times;</button>
         </div>
-        
+
         <div class="modal-body">
           <div class="search-section">
-            <input 
+            <input
               v-model="searchQuery"
               @input="searchCryptocurrencies"
               placeholder="Search cryptocurrencies..."
               class="search-input"
               autofocus
             />
-            
+
             <div v-if="searchResults.length > 0" class="search-results">
-              <div 
-                v-for="crypto in searchResults" 
+              <div
+                v-for="crypto in searchResults"
                 :key="crypto.id"
                 class="search-result-item"
                 :class="{ 'already-added': crypto.is_watchlisted }"
                 @click="!crypto.is_watchlisted && addToWatchlist(crypto)"
               >
-                <img :src="crypto.image" :alt="crypto.name" class="crypto-icon-small">
+                <img
+                  :src="crypto.image"
+                  :alt="crypto.name"
+                  class="crypto-icon-small"
+                />
                 <div class="crypto-info">
                   <span class="crypto-name">{{ crypto.name }}</span>
-                  <span class="crypto-symbol">{{ crypto.symbol.toUpperCase() }}</span>
+                  <span class="crypto-symbol">{{
+                    crypto.symbol.toUpperCase()
+                  }}</span>
                 </div>
                 <div class="crypto-metrics">
-                  <div class="price">{{ formatPLN(crypto.current_price_pln) }}</div>
-                  <div class="mentions">{{ crypto.daily_mentions }} mentions</div>
+                  <div class="price">
+                    {{ formatPLN(crypto.current_price_pln) }}
+                  </div>
+                  <div class="mentions">
+                    {{ crypto.daily_mentions }} mentions
+                  </div>
                 </div>
                 <div class="action-area">
-                  <span v-if="crypto.is_watchlisted" class="already-added-label">✓ Added</span>
+                  <span v-if="crypto.is_watchlisted" class="already-added-label"
+                    >✓ Added</span
+                  >
                   <button v-else class="btn btn-small btn-primary">Add</button>
                 </div>
               </div>
             </div>
-            
+
             <div v-else-if="searchQuery.length > 2" class="no-results">
               <p>No cryptocurrencies found matching "{{ searchQuery }}"</p>
             </div>
@@ -188,21 +217,31 @@
     </div>
 
     <!-- Crypto History Modal -->
-    <div v-if="selectedCryptoHistory" class="modal-overlay" @click="closeCryptoHistory">
+    <div
+      v-if="selectedCryptoHistory"
+      class="modal-overlay"
+      @click="closeCryptoHistory"
+    >
       <div class="modal-content history-modal" @click.stop>
         <div class="modal-header">
           <div class="crypto-header">
-            <img :src="selectedCryptoHistory.cryptocurrency.image" class="crypto-icon">
+            <img
+              :src="selectedCryptoHistory.cryptocurrency.image"
+              class="crypto-icon"
+            />
             <div>
               <h3>{{ selectedCryptoHistory.cryptocurrency.name }} History</h3>
-              <p>{{ selectedCryptoHistory.cryptocurrency.symbol.toUpperCase() }} sentiment over time</p>
+              <p>
+                {{ selectedCryptoHistory.cryptocurrency.symbol.toUpperCase() }}
+                sentiment over time
+              </p>
             </div>
           </div>
           <button @click="closeCryptoHistory" class="close-btn">&times;</button>
         </div>
-        
+
         <div class="modal-body">
-          <crypto-history-component 
+          <crypto-history-component
             :coin-gecko-id="selectedCryptoHistory.cryptocurrency.coingecko_id"
             :crypto-name="selectedCryptoHistory.cryptocurrency.name"
           ></crypto-history-component>
@@ -214,18 +253,18 @@
 
 <script>
 export default {
-  name: 'WatchlistComponent',
+  name: "WatchlistComponent",
   data() {
     return {
       watchlist: [],
       loading: false,
       showAddModal: false,
       showDiscovery: false,
-      searchQuery: '',
+      searchQuery: "",
       searchResults: [],
       searchTimeout: null,
       selectedCryptoHistory: null,
-    }
+    };
   },
   async mounted() {
     await this.loadWatchlist();
@@ -234,12 +273,12 @@ export default {
     async loadWatchlist() {
       this.loading = true;
       try {
-        const response = await window.axios.get('/api/watchlist');
+        const response = await window.axios.get("/api/watchlist");
         this.watchlist = response.data.watchlist;
-        this.$emit('watchlist-updated', response.data.total_count);
+        this.$emit("watchlist-updated", response.data.total_count);
       } catch (error) {
-        console.error('Error loading watchlist:', error);
-        this.showError('Failed to load watchlist');
+        console.error("Error loading watchlist:", error);
+        this.showError("Failed to load watchlist");
       } finally {
         this.loading = false;
       }
@@ -254,12 +293,12 @@ export default {
       clearTimeout(this.searchTimeout);
       this.searchTimeout = setTimeout(async () => {
         try {
-          const response = await window.axios.get('/api/discovery/search', {
-            params: { q: this.searchQuery }
+          const response = await window.axios.get("/api/discovery/search", {
+            params: { q: this.searchQuery },
           });
           this.searchResults = response.data;
         } catch (error) {
-          console.error('Search error:', error);
+          console.error("Search error:", error);
           this.searchResults = [];
         }
       }, 300);
@@ -267,55 +306,55 @@ export default {
 
     async addToWatchlist(crypto) {
       try {
-        await window.axios.post('/api/watchlist', {
+        await window.axios.post("/api/watchlist", {
           cryptocurrency_id: crypto.id,
-          notifications_enabled: true
+          notifications_enabled: true,
         });
-        
+
         this.showSuccess(`${crypto.name} added to watchlist`);
         await this.loadWatchlist();
-        
+
         // Update search results to reflect the change
         crypto.is_watchlisted = true;
-        
       } catch (error) {
-        console.error('Error adding to watchlist:', error);
-        this.showError('Failed to add to watchlist');
+        console.error("Error adding to watchlist:", error);
+        this.showError("Failed to add to watchlist");
       }
     },
 
     async removeCrypto(watchlistItem) {
       const cryptoName = watchlistItem.cryptocurrency.name;
-      
+
       if (!confirm(`Remove ${cryptoName} from your watchlist?`)) {
         return;
       }
 
       try {
-        // Find the watchlist item ID (we'll need to add this to the API response)
+        // Użyj ID z watchlistItem
         await window.axios.delete(`/api/watchlist/${watchlistItem.id}`);
-        
+
         this.showSuccess(`${cryptoName} removed from watchlist`);
         await this.loadWatchlist();
-        
       } catch (error) {
-        console.error('Error removing from watchlist:', error);
-        this.showError('Failed to remove from watchlist');
+        console.error("Error removing from watchlist:", error);
+        this.showError("Failed to remove from watchlist");
       }
     },
 
     async toggleNotifications(watchlistItem, event) {
       try {
+        // Użyj ID z watchlistItem
         await window.axios.put(`/api/watchlist/${watchlistItem.id}`, {
-          notifications_enabled: event.target.checked
+          notifications_enabled: event.target.checked,
         });
-        
-        const status = event.target.checked ? 'enabled' : 'disabled';
-        this.showSuccess(`Notifications ${status} for ${watchlistItem.cryptocurrency.name}`);
-        
+
+        const status = event.target.checked ? "enabled" : "disabled";
+        this.showSuccess(
+          `Notifications ${status} for ${watchlistItem.cryptocurrency.name}`
+        );
       } catch (error) {
-        console.error('Error updating notifications:', error);
-        this.showError('Failed to update notification settings');
+        console.error("Error updating notifications:", error);
+        this.showError("Failed to update notification settings");
         // Revert checkbox
         event.target.checked = !event.target.checked;
       }
@@ -324,22 +363,22 @@ export default {
     async initializeDefaultWatchlist() {
       try {
         // Get top 10 cryptos and add them
-        const response = await window.axios.get('/api/discovery/trending?limit=10');
+        const response = await window.axios.get(
+          "/api/discovery/trending?limit=10"
+        );
         const topCryptos = response.data.trending.slice(0, 10);
-        
-        const cryptoIds = topCryptos.map(crypto => crypto.id);
-        
-        await window.axios.post('/api/watchlist/bulk-add', {
+
+        const cryptoIds = topCryptos.map((crypto) => crypto.id);
+        await window.axios.post("/api/watchlist/bulk-add", {
           cryptocurrency_ids: cryptoIds,
-          notifications_enabled: true
+          notifications_enabled: true,
         });
-        
-        this.showSuccess('Added popular cryptocurrencies to your watchlist!');
+
+        this.showSuccess("Added popular cryptocurrencies to your watchlist!");
         await this.loadWatchlist();
-        
       } catch (error) {
-        console.error('Error initializing watchlist:', error);
-        this.showError('Failed to initialize watchlist');
+        console.error("Error initializing watchlist:", error);
+        this.showError("Failed to initialize watchlist");
       }
     },
 
@@ -358,34 +397,34 @@ export default {
 
     closeAddModal() {
       this.showAddModal = false;
-      this.searchQuery = '';
+      this.searchQuery = "";
       this.searchResults = [];
     },
 
     getWatchlistCardClass(item) {
       return {
-        'card-bullish': item.trend_direction === 'up',
-        'card-bearish': item.trend_direction === 'down',
-        'card-neutral': item.trend_direction === 'neutral'
+        "card-bullish": item.trend_direction === "up",
+        "card-bearish": item.trend_direction === "down",
+        "card-neutral": item.trend_direction === "neutral",
       };
     },
 
     getSentimentClass(sentiment) {
-      if (sentiment > 0.1) return 'sentiment-positive';
-      if (sentiment < -0.1) return 'sentiment-negative';
-      return 'sentiment-neutral';
+      if (sentiment > 0.1) return "sentiment-positive";
+      if (sentiment < -0.1) return "sentiment-negative";
+      return "sentiment-neutral";
     },
 
     getPriceChangeClass(change) {
-      if (change > 0) return 'price-positive';
-      if (change < 0) return 'price-negative';
-      return 'price-neutral';
+      if (change > 0) return "price-positive";
+      if (change < 0) return "price-negative";
+      return "price-neutral";
     },
 
     formatPLN(amount) {
-      return parseFloat(amount || 0).toLocaleString('pl-PL', {
-        style: 'currency',
-        currency: 'PLN'
+      return parseFloat(amount || 0).toLocaleString("pl-PL", {
+        style: "currency",
+        currency: "PLN",
       });
     },
 
@@ -405,18 +444,19 @@ export default {
     },
 
     handleImageError(event) {
-      event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2MzY2ZjEiLz4KPHR5cGU+4oKfPC90ZXh0Pgo8L3N2Zz4K';
+      event.target.src =
+        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2MzY2ZjEiLz4KPHR5cGU+4oKfPC90ZXh0Pgo8L3N2Zz4K";
     },
 
     showSuccess(message) {
-      console.log('Success:', message);
+      console.log("Success:", message);
     },
 
     showError(message) {
-      console.error('Error:', message);
-    }
-  }
-}
+      console.error("Error:", message);
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -480,12 +520,20 @@ export default {
 
 .card-bullish {
   border-color: #10b981;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.03), rgba(16, 185, 129, 0.01));
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.03),
+    rgba(16, 185, 129, 0.01)
+  );
 }
 
 .card-bearish {
   border-color: #ef4444;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03), rgba(239, 68, 68, 0.01));
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.03),
+    rgba(239, 68, 68, 0.01)
+  );
 }
 
 .card-neutral {
@@ -962,8 +1010,12 @@ input:checked + .toggle-slider:before {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-icon {
@@ -988,25 +1040,25 @@ input:checked + .toggle-slider:before {
     align-items: stretch;
     gap: 1rem;
   }
-  
+
   .header-actions {
     justify-content: stretch;
   }
-  
+
   .watchlist-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .card-header {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
   }
-  
+
   .card-actions {
     justify-content: flex-end;
   }
-  
+
   .metrics-row {
     grid-template-columns: 1fr;
     gap: 0.5rem;

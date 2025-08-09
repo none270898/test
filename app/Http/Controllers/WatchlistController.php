@@ -11,9 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class WatchlistController extends Controller
 {
-    public function __construct(private SentimentAnalysisService $sentimentService)
-    {
-    }
+    public function __construct(private SentimentAnalysisService $sentimentService) {}
 
     /**
      * Get user's watchlist
@@ -21,17 +19,44 @@ class WatchlistController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
-        // If user has no watchlist, initialize with defaults
-        if ($user->watchlist()->count() === 0) {
-            $this->sentimentService->initializeDefaultWatchlist($user);
-        }
 
-        $watchlistSummary = $this->sentimentService->getWatchlistSummary($user);
+        // if ($user->watchlist()->count() === 0) {
+        //     $this->sentimentService->initializeDefaultWatchlist($user);
+        // }
+
+        // Dodaj ID do odpowiedzi
+        $watchlist = $user->watchlist()
+            ->with('cryptocurrency')
+            ->get();
+
+        $watchlistSummary = $watchlist->map(function ($item) {
+            $crypto = $item->cryptocurrency;
+            $latestAnalysis = $crypto->getLatestTrendAnalysis();
+
+            return [
+                'id' => $item->id, // DODANE ID
+                'cryptocurrency' => [
+                    'id' => $crypto->id,
+                    'name' => $crypto->name,
+                    'symbol' => $crypto->symbol,
+                    'image' => $crypto->image,
+                    'current_price_pln' => $crypto->current_price_pln,
+                    'price_change_24h' => $crypto->price_change_24h,
+                ],
+                'sentiment_avg' => $crypto->current_sentiment ?? 0,
+                'mention_count' => $crypto->daily_mentions ?? 0,
+                'trend_direction' => $latestAnalysis?->trend_direction ?? 'neutral',
+                'confidence_score' => $latestAnalysis?->confidence_score ?? 0,
+                'sentiment_change' => $crypto->sentiment_change_24h ?? 0,
+                'emoji' => $latestAnalysis?->getTrendEmoji() ?? '➡️',
+                'analysis_time' => $crypto->sentiment_updated_at?->diffForHumans() ?? 'Never',
+                'notifications_enabled' => $item->notifications_enabled,
+            ];
+        });
 
         return response()->json([
             'watchlist' => $watchlistSummary,
-            'total_count' => count($watchlistSummary),
+            'total_count' => $watchlistSummary->count(),
         ]);
     }
 
@@ -107,7 +132,6 @@ class WatchlistController extends Controller
      */
     public function bulkAdd(Request $request)
     {
-        dd($request);
         $request->validate([
             'cryptocurrency_ids' => 'required|array|min:1|max:20',
             'cryptocurrency_ids.*' => 'exists:cryptocurrencies,id',
