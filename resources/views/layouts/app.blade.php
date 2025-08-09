@@ -29,16 +29,16 @@
             <div class="nav-container">
                 <a href="{{ route('home') }}" class="nav-brand">
                     <span class="brand-icon">₿</span>
-                    CryptoNote.pl
+                    <span class="brand-text">CryptoNote.pl</span>
                 </a>
-
+                
                 <div class="nav-menu">
                     @guest
                         <a href="{{ route('login') }}" class="nav-link">Logowanie</a>
                         <a href="{{ route('register') }}" class="nav-button">Rejestracja</a>
                     @else
                         <a href="{{ route('dashboard') }}" class="nav-link">Dashboard</a>
-                        @if (auth()->user()->isPremium())
+                        @if(auth()->user()->isPremium())
                             <span class="premium-badge">Premium</span>
                         @endif
                         <form method="POST" action="{{ route('logout') }}" class="inline">

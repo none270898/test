@@ -59,6 +59,20 @@
             <span v-if="activeAlerts > 0" class="alert-badge">{{ activeAlerts }}</span>
           </button>
           <button 
+            @click="activeTab = 'watchlist'" 
+            :class="['tab-button', { 'tab-active': activeTab === 'watchlist' }]"
+          >
+            <span class="tab-icon">⭐</span>
+            Watchlist
+          </button>
+          <button 
+            @click="activeTab = 'discovery'" 
+            :class="['tab-button', { 'tab-active': activeTab === 'discovery' }]"
+          >
+            <span class="tab-icon">🔥</span>
+            Discovery
+          </button>
+          <button 
             v-if="isPremium"
             @click="activeTab = 'analytics'" 
             :class="['tab-button', { 'tab-active': activeTab === 'analytics' }]"
@@ -79,10 +93,22 @@
           <alerts-component @alerts-updated="updateAlertsCount"></alerts-component>
         </div>
         
+        <div v-show="activeTab === 'watchlist'" class="tab-panel">
+          <watchlist-component></watchlist-component>
+        </div>
+        
+        <div v-show="activeTab === 'discovery'" class="tab-panel">
+          <discovery-component :is-premium="isPremium"></discovery-component>
+        </div>
+        
         <div v-show="activeTab === 'analytics'" class="tab-panel">
-          <div v-if="isPremium" class="premium-content">
+          <sentiment-analytics-component v-if="isPremium"></sentiment-analytics-component>
+          <div v-else class="premium-content">
             <h3>🤖 AI Trend Analysis</h3>
-            <p>AI analytics feature will be implemented in the next step!</p>
+            <p>Upgrade to Premium to unlock AI-powered sentiment analysis from Polish crypto communities!</p>
+            <button class="btn btn-premium" style="margin-top: 1rem;">
+              Upgrade to Premium - 19 PLN/month
+            </button>
           </div>
         </div>
       </div>
@@ -147,13 +173,16 @@ export default {
   methods: {
     async loadDashboardData() {
       try {
-        // Get user premium status - this should come from a Laravel endpoint
-        // For now, we'll simulate it
-        this.isPremium = false; // This should come from the server
-        this.activeAlerts = 0;
+        // Get user data including premium status
+        const userResponse = await window.axios.get('/api/user-status');
+        this.isPremium = userResponse.data.isPremium || false;
+        
+        console.log('Premium status:', this.isPremium);
+        
         this.loading = false;
       } catch (error) {
         console.error('Error loading dashboard:', error);
+        this.isPremium = false; // Fallback to false
         this.loading = false;
       }
     },
@@ -263,6 +292,20 @@ export default {
   border-top: 2px dashed #e2e8f0;
 }
 
+@media (max-width: 768px) {
+  .premium-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .premium-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+  }
+}
+
 .premium-content {
   background: white;
   border-radius: 12px;
@@ -301,6 +344,22 @@ export default {
   margin-bottom: 3rem;
 }
 
+@media (max-width: 768px) {
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
 .stat-card {
   background: white;
   border-radius: 12px;
@@ -316,6 +375,22 @@ export default {
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .stat-card {
+    padding: 1.25rem;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card {
+    padding: 1rem;
+    gap: 0.75rem;
+    flex-direction: column;
+    text-align: center;
+  }
 }
 
 .stat-icon {
@@ -411,6 +486,22 @@ export default {
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  .premium-upsell {
+    margin: -1.5rem -1.5rem -1.5rem -1.5rem;
+    padding: 1.5rem;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .premium-upsell {
+    margin: -1rem -1rem -1rem -1rem;
+    padding: 1.25rem;
+    border-radius: 8px;
+  }
+}
+
 .upsell-content h3 {
   margin-bottom: 1rem;
   font-size: 1.5rem;
@@ -419,6 +510,30 @@ export default {
 .upsell-content p {
   margin-bottom: 1.5rem;
   opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .upsell-content h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .upsell-content p {
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .upsell-content h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .upsell-content p {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
 }
 
 .premium-features {
@@ -431,6 +546,30 @@ export default {
 .premium-features li {
   padding: 0.5rem 0;
   opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .premium-features {
+    max-width: 100%;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+  }
+  
+  .premium-features li {
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .premium-features {
+    margin: 0 auto 1rem;
+  }
+  
+  .premium-features li {
+    padding: 0.3rem 0;
+    font-size: 0.85rem;
+  }
 }
 
 .modal-overlay {

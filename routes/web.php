@@ -7,6 +7,23 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
+
+Route::get('/debug-premium', function () {
+    if (!auth()->check()) {
+        return 'Not logged in';
+    }
+    
+    $user = auth()->user();
+    
+    return response()->json([
+        'user_id' => $user->id,
+        'name' => $user->name,
+        'premium' => $user->premium,
+        'premium_expires_at' => $user->premium_expires_at,
+        'isPremium_method' => $user->isPremium(),
+        'current_time' => now(),
+    ]);
+})->middleware('auth')->name('debug.premium');
 Route::get('/test-onesignal-send', function () {
     if (!auth()->check()) {
         return redirect()->route('login');

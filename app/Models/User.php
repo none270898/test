@@ -51,6 +51,24 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(PriceAlert::class);
     }
 
+    public function watchlist()
+    {
+        return $this->hasMany(UserWatchlist::class);
+    }
+
+    public function sentimentAlerts()
+    {
+        return $this->hasMany(SentimentAlert::class);
+    }
+
+    public function getWatchlistCryptos()
+    {
+        return $this->watchlist()
+            ->with('cryptocurrency')
+            ->get()
+            ->pluck('cryptocurrency');
+    }
+
     public function isPremium(): bool
     {
         return $this->premium && 

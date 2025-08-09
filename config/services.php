@@ -40,7 +40,10 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
     'twitter' => [
-        'bearer_token' => env('TWITTER_BEARER_TOKEN'),
+        'api_key' => env('TWITTER_API_KEY'),
+        'api_secret' => env('TWITTER_API_SECRET'),
+        'access_token' => env('TWITTER_ACCESS_TOKEN'),
+        'access_token_secret' => env('TWITTER_ACCESS_TOKEN_SECRET'),
     ],
     'onesignal' => [
         'app_id' => env('ONESIGNAL_APP_ID'),

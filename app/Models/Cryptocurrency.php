@@ -43,4 +43,21 @@ class Cryptocurrency extends Model
     {
         return $this->hasMany(TrendAnalysis::class);
     }
+
+    public function watchlistedBy()
+    {
+        return $this->hasMany(UserWatchlist::class);
+    }
+
+    public function isWatchlistedBy(User $user): bool
+    {
+        return $this->watchlistedBy()->where('user_id', $user->id)->exists();
+    }
+
+    public function getLatestTrendAnalysis()
+    {
+        return $this->trendAnalyses()
+            ->where('analysis_date', today())
+            ->first();
+    }
 }
