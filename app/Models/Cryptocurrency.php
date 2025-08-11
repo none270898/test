@@ -34,7 +34,7 @@ class Cryptocurrency extends Model
             'current_sentiment' => 'decimal:2',
             'sentiment_change_24h' => 'decimal:2',
             'last_updated' => 'datetime',
-            'sentiment_updated_at' => 'datetime', // DODANE
+            'sentiment_updated_at' => 'datetime',
         ];
     }
 
@@ -76,5 +76,61 @@ class Cryptocurrency extends Model
             ->whereDate('created_at', today())
             ->orderBy('created_at', 'desc')
             ->first();
+    }
+
+    public function getTodayTrendAnalyses()
+    {
+        return $this->trendAnalyses()
+            ->whereDate('created_at', today())
+            ->orderBy('created_at', 'desc');
+    }
+
+    // DODANE BRAKUJĄCE METODY:
+
+    /**
+     * Get trending status based on trending_score
+     */
+    public function getTrendingStatus(): string
+    {
+        $score = $this->trending_score ?? 0;
+        
+        if ($score >= 80) {
+            return 'hot';
+        } elseif ($score >= 50) {
+            return 'trending';
+        } elseif ($score >= 20) {
+            return 'moderate';
+        } else {
+            return 'low';
+        }
+    }
+
+    /**
+     * Get sentiment emoji based on current sentiment
+     */
+    public function getSentimentEmoji(): string
+    {
+        $sentiment = $this->current_sentiment ?? 0;
+        
+        if ($sentiment > 0.3) {
+            return '🚀';
+        } elseif ($sentiment > 0.1) {
+            return '📈';
+        } elseif ($sentiment < -0.3) {
+            return '📉';
+        } elseif ($sentiment < -0.1) {
+            return '🔻';
+        } else {
+            return '➡️';
+        }
+    }
+
+    /**
+     * Check if has recent sentiment data
+     */
+    public function hasRecentSentimentData(int $hours = 24): bool
+    {
+        return $this->sentiment_updated_at && 
+               $this->sentiment_updated_at->isAfter(now()->subHours($hours));
     }
 }
