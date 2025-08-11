@@ -6,6 +6,7 @@ use App\Models\TrendAnalysis;
 use App\Services\SentimentAnalysisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class DiscoveryController extends Controller
 {
@@ -38,39 +39,112 @@ class DiscoveryController extends Controller
     }
 
     /**
-     * Get sentiment history for a cryptocurrency
+     * Get sentiment history for a cryptocurrency - NAPRAWIONE
      */
     public function history(Request $request, string $coinGeckoId)
     {
         $days = min($request->get('days', 7), 30);
         
+        Log::info('Discovery history request', [
+            'coingecko_id' => $coinGeckoId,
+            'days' => $days
+        ]);
+        
+        // Find cryptocurrency by coingecko_id
         $crypto = Cryptocurrency::where('coingecko_id', $coinGeckoId)->first();
         if (!$crypto) {
+            Log::warning('Cryptocurrency not found', ['coingecko_id' => $coinGeckoId]);
             return response()->json(['error' => 'Cryptocurrency not found'], 404);
         }
 
+        // Get trend analyses for this crypto in the specified period - now with better hourly support
         $analyses = TrendAnalysis::where('cryptocurrency_id', $crypto->id)
-            ->where('analysis_date', '>=', now()->subDays($days))
-            ->orderBy('analysis_date', 'asc')
+            ->where('created_at', '>=', now()->subDays($days))
+            ->orderBy('created_at', 'asc')
             ->get();
 
-        $historyData = $analyses->map(function ($analysis) {
-            return [
-                'date' => $analysis->analysis_date->format('Y-m-d'),
-                'sentiment_avg' => $analysis->sentiment_avg,
-                'mention_count' => $analysis->mention_count,
-                'trend_direction' => $analysis->trend_direction,
-                'confidence_score' => $analysis->confidence_score,
-                'sentiment_change' => $analysis->sentiment_change,
-                'hourly_breakdown' => $analysis->hourly_breakdown,
-            ];
-        });
+        Log::info('Found trend analyses', [
+            'crypto' => $crypto->name,
+            'analyses_count' => $analyses->count(),
+            'period_days' => $days,
+            'hourly_analyses' => true
+        ]);
 
-        // Calculate summary stats
-        $totalMentions = $analyses->sum('mention_count');
-        $avgSentiment = $analyses->avg('sentiment_avg');
-        $sentimentTrend = $analyses->count() > 1 
-            ? $analyses->last()->sentiment_avg - $analyses->first()->sentiment_avg 
+        // Group by day and aggregate hourly data
+        $dailyAnalyses = $analyses->groupBy(function ($analysis) {
+            return $analysis->created_at->format('Y-m-d');
+        })->map(function ($dayAnalyses, $date) {
+            // Get the most recent analysis of the day for trend direction
+            $latestAnalysis = $dayAnalyses->last();
+            
+            return [
+                'date' => $date,
+                'sentiment_avg' => round($dayAnalyses->avg('sentiment_avg'), 2),
+                'mention_count' => $dayAnalyses->sum('mention_count'),
+                'trend_direction' => $latestAnalysis->trend_direction,
+                'confidence_score' => round($dayAnalyses->avg('confidence_score')),
+                'sentiment_change' => $latestAnalysis->sentiment_change ?? 0,
+                'hourly_breakdown' => $latestAnalysis->hourly_breakdown ?? [],
+                'analyses_count' => $dayAnalyses->count(), // How many analyses this day
+                'first_analysis' => $dayAnalyses->first()->created_at->format('H:i'),
+                'last_analysis' => $latestAnalysis->created_at->format('H:i'),
+            ];
+        })->values();
+
+        Log::info('Found trend analyses', [
+            'crypto' => $crypto->name,
+            'analyses_count' => $analyses->count(),
+            'period_days' => $days
+        ]);
+
+        // If no analyses found, try to get at least current data from cryptocurrency table
+        if ($dailyAnalyses->isEmpty()) {
+            // Create mock data point from current cryptocurrency data
+            $mockHistoryData = [];
+            
+            if ($crypto->sentiment_updated_at) {
+                $mockHistoryData[] = [
+                    'date' => $crypto->sentiment_updated_at->format('Y-m-d'),
+                    'sentiment_avg' => $crypto->current_sentiment ?? 0,
+                    'mention_count' => $crypto->daily_mentions ?? 0,
+                    'trend_direction' => 'neutral',
+                    'confidence_score' => 50,
+                    'sentiment_change' => $crypto->sentiment_change_24h ?? 0,
+                    'hourly_breakdown' => [],
+                ];
+            }
+
+            return response()->json([
+                'cryptocurrency' => [
+                    'id' => $crypto->id,
+                    'name' => $crypto->name,
+                    'symbol' => $crypto->symbol,
+                    'image' => $crypto->image,
+                    'coingecko_id' => $crypto->coingecko_id,
+                ],
+                'history' => $mockHistoryData,
+                'summary' => [
+                    'total_mentions' => $crypto->daily_mentions ?? 0,
+                    'avg_sentiment' => round($crypto->current_sentiment ?? 0, 2),
+                    'sentiment_trend' => round($crypto->sentiment_change_24h ?? 0, 2),
+                    'days_analyzed' => count($mockHistoryData),
+                ],
+                'period' => [
+                    'days' => $days,
+                    'from' => now()->subDays($days)->format('Y-m-d'),
+                    'to' => now()->format('Y-m-d'),
+                ],
+            ]);
+        }
+
+        // Transform daily analyses data for the response
+        $historyData = $dailyAnalyses;
+
+        // Calculate summary stats from daily aggregated data
+        $totalMentions = $dailyAnalyses->sum('mention_count');
+        $avgSentiment = $dailyAnalyses->avg('sentiment_avg');
+        $sentimentTrend = $dailyAnalyses->count() > 1 
+            ? $dailyAnalyses->last()['sentiment_avg'] - $dailyAnalyses->first()['sentiment_avg']
             : 0;
 
         return response()->json([
@@ -86,7 +160,7 @@ class DiscoveryController extends Controller
                 'total_mentions' => $totalMentions,
                 'avg_sentiment' => round($avgSentiment, 2),
                 'sentiment_trend' => round($sentimentTrend, 2),
-                'days_analyzed' => $analyses->count(),
+                'days_analyzed' => $dailyAnalyses->count(),
             ],
             'period' => [
                 'days' => $days,
@@ -133,34 +207,45 @@ class DiscoveryController extends Controller
     }
 
     /**
-     * Get discovery stats and overview
+     * Get discovery stats and overview - IMPROVED to use cryptocurrency fields
      */
     public function stats()
     {
-        $today = today();
+        // Get stats from cryptocurrency table (now properly updated)
+        $recentlyUpdated = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())->get();
         
-        // Get overall stats
-        $totalCryptosAnalyzed = Cryptocurrency::where('sentiment_updated_at', '>=', $today)->count();
-        $totalMentionsToday = Cryptocurrency::where('sentiment_updated_at', '>=', $today)->sum('daily_mentions');
-        $avgSentimentToday = Cryptocurrency::where('sentiment_updated_at', '>=', $today)->avg('current_sentiment');
+        $totalCryptosAnalyzed = $recentlyUpdated->count();
+        $totalMentionsToday = $recentlyUpdated->sum('daily_mentions');
+        $avgSentimentToday = $recentlyUpdated->avg('current_sentiment');
 
-        // Get top performers
-        $topPositive = Cryptocurrency::where('sentiment_updated_at', '>=', $today)
+        // Get top performers using the updated fields
+        $topPositive = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())
             ->where('current_sentiment', '>', 0)
+            ->where('daily_mentions', '>', 0) // Must have mentions to be relevant
             ->orderBy('current_sentiment', 'desc')
             ->limit(3)
             ->get(['name', 'symbol', 'image', 'current_sentiment', 'daily_mentions']);
 
-        $topNegative = Cryptocurrency::where('sentiment_updated_at', '>=', $today)
+        $topNegative = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())
             ->where('current_sentiment', '<', 0)
+            ->where('daily_mentions', '>', 0)
             ->orderBy('current_sentiment', 'asc')
             ->limit(3)
             ->get(['name', 'symbol', 'image', 'current_sentiment', 'daily_mentions']);
 
-        $mostMentioned = Cryptocurrency::where('sentiment_updated_at', '>=', $today)
+        $mostMentioned = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())
+            ->where('daily_mentions', '>', 0)
             ->orderBy('daily_mentions', 'desc')
             ->limit(5)
             ->get(['name', 'symbol', 'image', 'current_sentiment', 'daily_mentions']);
+
+        // Get trending distribution
+        $trendingDistribution = [
+            'hot' => Cryptocurrency::where('trending_score', '>', 80)->count(),
+            'trending' => Cryptocurrency::whereBetween('trending_score', [50, 80])->count(),
+            'moderate' => Cryptocurrency::whereBetween('trending_score', [20, 50])->count(),
+            'low' => Cryptocurrency::where('trending_score', '<=', 20)->count(),
+        ];
 
         return response()->json([
             'overview' => [
@@ -168,6 +253,7 @@ class DiscoveryController extends Controller
                 'total_mentions_today' => $totalMentionsToday,
                 'avg_sentiment_today' => round($avgSentimentToday ?? 0, 2),
                 'last_updated' => now()->diffForHumans(),
+                'trending_distribution' => $trendingDistribution,
             ],
             'top_performers' => [
                 'most_positive' => $topPositive,

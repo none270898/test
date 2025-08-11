@@ -17,8 +17,8 @@ class ScrapeSentimentData implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        private array $subreddits = ['BitcoinPL', 'CryptoCurrency'],
-        private int $postsLimit = 25
+        private ?array $subreddits = null,
+        private int $postsLimit = 50 // Increased from 25
     ) {
     }
 
@@ -30,10 +30,23 @@ class ScrapeSentimentData implements ShouldQueue
         ]);
 
         try {
-            $processedCount = $redditService->scrapeCryptoPosts($this->subreddits, $this->postsLimit);
+            // Use default subreddits if none provided (now includes Polish ones)
+            $subreddits = $this->subreddits ?? [
+                'BitcoinPL', 
+                'kryptowaluty',
+                'CryptoCurrency',
+                'Bitcoin',
+                'ethereum',
+                'altcoin',
+                'CryptoMarkets',
+                'investing'
+            ];
+            
+            $processedCount = $redditService->scrapeCryptoPosts($subreddits, $this->postsLimit);
             
             Log::info('Sentiment scraping completed', [
-                'processed_posts' => $processedCount
+                'processed_posts' => $processedCount,
+                'subreddits_count' => count($subreddits)
             ]);
             
         } catch (\Exception $e) {

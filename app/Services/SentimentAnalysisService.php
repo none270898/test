@@ -114,7 +114,7 @@ class SentimentAnalysisService
     }
 
     /**
-     * Generate trend analysis for cryptocurrency (with smart deduplication)
+     * Generate trend analysis for cryptocurrency - ZMIENIONE NA INSERT ZAMIAST UPDATE
      */
     public function generateTrendAnalysis(string $coinGeckoId, int $hoursBack = 24): ?TrendAnalysis
     {
@@ -122,13 +122,6 @@ class SentimentAnalysisService
         if (!$crypto) {
             return null;
         }
-
-        $today = today();
-        
-        // Check if we already have analysis for today
-        $existingAnalysis = TrendAnalysis::where('cryptocurrency_id', $crypto->id)
-            ->where('analysis_date', $today)
-            ->first();
 
         $startTime = now()->subHours($hoursBack);
         $endTime = now();
@@ -140,6 +133,10 @@ class SentimentAnalysisService
             ->get();
 
         if ($sentimentData->isEmpty()) {
+            Log::debug('No sentiment data found for crypto', [
+                'coingecko_id' => $coinGeckoId,
+                'hours_back' => $hoursBack
+            ]);
             return null;
         }
 
@@ -169,16 +166,15 @@ class SentimentAnalysisService
         // Calculate confidence score (0-100)
         $confidenceScore = min(100, ($mentionCount * 2) + (abs($sentimentAvg) * 50));
 
-        // Get previous sentiment for comparison
+        // Get previous sentiment for comparison (from previous analysis, not just previous day)
         $previousAnalysis = TrendAnalysis::where('cryptocurrency_id', $crypto->id)
-            ->where('analysis_date', '<', $today)
-            ->orderBy('analysis_date', 'desc')
+            ->where('created_at', '<', $endTime) // Before current analysis period
+            ->orderBy('created_at', 'desc')
             ->first();
 
         $previousSentiment = $previousAnalysis ? $previousAnalysis->sentiment_avg : 0;
         $sentimentChange = $sentimentAvg - $previousSentiment;
 
-        // Create or update analysis
         $analysisData = [
             'cryptocurrency_id' => $crypto->id,
             'sentiment_avg' => round($sentimentAvg, 2),
@@ -187,27 +183,53 @@ class SentimentAnalysisService
             'confidence_score' => round($confidenceScore),
             'analysis_period_start' => $startTime,
             'analysis_period_end' => $endTime,
-            'analysis_date' => $today,
+            'analysis_date' => today(),
             'hourly_breakdown' => $hourlyBreakdown,
             'previous_sentiment' => round($previousSentiment, 2),
             'sentiment_change' => round($sentimentChange, 2),
         ];
 
-        if ($existingAnalysis) {
-            $existingAnalysis->update($analysisData);
-            $analysis = $existingAnalysis;
+        // Check if we have recent analysis (within last 30 minutes) to avoid spam
+        $recentAnalysis = TrendAnalysis::where('cryptocurrency_id', $crypto->id)
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->first();
+
+        if ($recentAnalysis) {
+            // Update recent analysis instead of creating duplicate
+            $recentAnalysis->update($analysisData);
+            $analysis = $recentAnalysis;
+            Log::debug('Updated recent analysis', ['crypto' => $crypto->name, 'analysis_id' => $analysis->id]);
         } else {
+            // Create new analysis entry for full history
             $analysis = TrendAnalysis::create($analysisData);
+            Log::debug('Created new analysis', ['crypto' => $crypto->name, 'analysis_id' => $analysis->id]);
         }
 
-        // Update cryptocurrency trending metrics
-        $this->updateCryptocurrencyMetrics($crypto, $sentimentAvg, $mentionCount, $sentimentChange);
+        // AKTUALIZUJ POLA W CRYPTOCURRENCIES - critical step
+        try {
+            $this->updateCryptocurrencyMetrics($crypto, $sentimentAvg, $mentionCount, $sentimentChange);
+        } catch (\Exception $e) {
+            Log::error('Failed to update cryptocurrency metrics', [
+                'crypto' => $crypto->name,
+                'error' => $e->getMessage(),
+                'sentiment' => $sentimentAvg,
+                'mentions' => $mentionCount
+            ]);
+            // Don't throw - analysis was successful, just metrics update failed
+        }
+
+        Log::info('Trend analysis created', [
+            'crypto' => $crypto->name,
+            'analysis_id' => $analysis->id,
+            'sentiment' => $sentimentAvg,
+            'mentions' => $mentionCount
+        ]);
 
         return $analysis;
     }
 
     /**
-     * Update cryptocurrency with latest sentiment metrics
+     * Update cryptocurrency with latest sentiment metrics - IMPROVED
      */
     private function updateCryptocurrencyMetrics(
         Cryptocurrency $crypto, 
@@ -215,29 +237,82 @@ class SentimentAnalysisService
         int $mentions, 
         float $sentimentChange
     ): void {
-        // Calculate trending score (combination of mentions, sentiment, and change)
-        $trendingScore = ($mentions * 2) + (abs($sentiment) * 10) + (abs($sentimentChange) * 15);
+        // Calculate trending score with better weighting
+        $mentionScore = min($mentions * 3, 150); // Cap mentions contribution at 150
+        $sentimentScore = abs($sentiment) * 25; // Absolute sentiment strength
+        $changeScore = abs($sentimentChange) * 20; // Sentiment change impact
+        $priceScore = $crypto->current_price_usd > 1000 ? 10 : 0; // Bonus for high-value coins
         
-        $crypto->update([
+        $trendingScore = $mentionScore + $sentimentScore + $changeScore + $priceScore;
+        
+        // Ensure minimum values
+        $mentions = max($mentions, 0);
+        $sentiment = max(-1, min(1, $sentiment)); // Clamp between -1 and 1
+        
+        $updateData = [
             'daily_mentions' => $mentions,
             'current_sentiment' => round($sentiment, 2),
             'sentiment_change_24h' => round($sentimentChange, 2),
             'trending_score' => round($trendingScore),
             'sentiment_updated_at' => now(),
+        ];
+
+        $updated = $crypto->update($updateData);
+
+        Log::info('Updated cryptocurrency metrics', [
+            'crypto' => $crypto->name,
+            'updated' => $updated,
+            'data' => $updateData,
+            'trending_calculation' => [
+                'mention_score' => $mentionScore,
+                'sentiment_score' => $sentimentScore,
+                'change_score' => $changeScore,
+                'price_score' => $priceScore,
+                'total' => $trendingScore
+            ]
         ]);
+
+        // Verify the update actually worked
+        $crypto->refresh();
+        if ($crypto->daily_mentions !== $mentions) {
+            Log::error('Cryptocurrency update failed', [
+                'crypto' => $crypto->name,
+                'expected_mentions' => $mentions,
+                'actual_mentions' => $crypto->daily_mentions
+            ]);
+        }
     }
 
     /**
-     * Get trending cryptocurrencies for discovery
+     * Get trending cryptocurrencies for discovery - NAPRAWIONE
      */
     public function getTrendingCryptos(int $limit = 20): array
     {
+        // Get cryptocurrencies with recent sentiment data (last 6 hours for more fresh data)
         $trending = Cryptocurrency::where('daily_mentions', '>', 0)
-            ->where('sentiment_updated_at', '>=', now()->subDay())
+            ->where('sentiment_updated_at', '>=', now()->subHours(6)) // Changed from 2 days to 6 hours
+            ->whereNotNull('current_price_pln')
+            ->where('current_price_pln', '>', 0)
             ->orderBy('trending_score', 'desc')
             ->orderBy('daily_mentions', 'desc')
             ->limit($limit)
             ->get();
+
+        Log::info('getTrendingCryptos query result', [
+            'count' => $trending->count(),
+            'limit' => $limit
+        ]);
+
+        // If no trending cryptos with sentiment, fallback to top cryptos by price
+        if ($trending->isEmpty()) {
+            Log::warning('No trending cryptos found, using fallback');
+            
+            $trending = Cryptocurrency::whereNotNull('current_price_pln')
+                ->where('current_price_pln', '>', 0)
+                ->orderBy('current_price_usd', 'desc')
+                ->limit($limit)
+                ->get();
+        }
 
         return $trending->map(function ($crypto) {
             $latestAnalysis = $crypto->getLatestTrendAnalysis();
@@ -248,16 +323,17 @@ class SentimentAnalysisService
                 'name' => $crypto->name,
                 'symbol' => $crypto->symbol,
                 'image' => $crypto->image,
-                'current_price_pln' => $crypto->current_price_pln,
-                'price_change_24h' => $crypto->price_change_24h,
-                'daily_mentions' => $crypto->daily_mentions,
-                'current_sentiment' => $crypto->current_sentiment,
-                'sentiment_change_24h' => $crypto->sentiment_change_24h,
-                'trending_score' => $crypto->trending_score,
+                'current_price_pln' => $crypto->current_price_pln ?? 0,
+                'price_change_24h' => $crypto->price_change_24h ?? 0,
+                'daily_mentions' => $crypto->daily_mentions ?? 0,
+                'current_sentiment' => $crypto->current_sentiment ?? 0,
+                'sentiment_change_24h' => $crypto->sentiment_change_24h ?? 0,
+                'trending_score' => $crypto->trending_score ?? 0,
                 'trend_direction' => $latestAnalysis?->trend_direction ?? 'neutral',
                 'confidence_score' => $latestAnalysis?->confidence_score ?? 0,
                 'emoji' => $latestAnalysis?->getTrendEmoji() ?? '➡️',
-                'updated_at' => $crypto->sentiment_updated_at?->diffForHumans(),
+                'updated_at' => $crypto->sentiment_updated_at ? $crypto->sentiment_updated_at->diffForHumans() : 'Never',
+                'last_analysis_at' => $latestAnalysis?->created_at?->diffForHumans() ?? 'Never', // ADDED
             ];
         })->toArray();
     }
@@ -269,19 +345,23 @@ class SentimentAnalysisService
     {
         $watchlistCryptos = $user->getWatchlistCryptos();
         
-        // if ($watchlistCryptos->isEmpty()) {
-        //     return [];
-        // }
+        if ($watchlistCryptos->isEmpty()) {
+            return [];
+        }
 
         $cryptoIds = $watchlistCryptos->pluck('id')->toArray();
         
         $analyses = TrendAnalysis::whereIn('cryptocurrency_id', $cryptoIds)
-            ->where('analysis_date', today())
+            ->where('created_at', '>=', now()->subHours(12)) // Last 12 hours instead of 1 day
             ->with('cryptocurrency')
-            ->orderBy('confidence_score', 'desc')
-            ->get();
+            ->orderBy('created_at', 'desc') // Most recent first
+            ->get()
+            ->groupBy('cryptocurrency_id') // Group by crypto
+            ->map(function ($cryptoAnalyses) {
+                return $cryptoAnalyses->first(); // Take most recent analysis for each crypto
+            });
 
-        return $analyses->map(function ($analysis) {
+        return $analyses->values()->map(function ($analysis) { // ->values() to flatten after groupBy
             return [
                 'cryptocurrency' => [
                     'id' => $analysis->cryptocurrency->id,

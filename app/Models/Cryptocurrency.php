@@ -17,6 +17,12 @@ class Cryptocurrency extends Model
         'current_price_pln',
         'price_change_24h',
         'last_updated',
+        // Sentiment fields - IMPORTANT for updates
+        'daily_mentions',
+        'current_sentiment',
+        'sentiment_change_24h',
+        'trending_score',
+        'sentiment_updated_at',
     ];
 
     protected function casts(): array
@@ -25,7 +31,10 @@ class Cryptocurrency extends Model
             'current_price_usd' => 'decimal:8',
             'current_price_pln' => 'decimal:8',
             'price_change_24h' => 'decimal:2',
+            'current_sentiment' => 'decimal:2',
+            'sentiment_change_24h' => 'decimal:2',
             'last_updated' => 'datetime',
+            'sentiment_updated_at' => 'datetime', // DODANE
         ];
     }
 
@@ -57,7 +66,15 @@ class Cryptocurrency extends Model
     public function getLatestTrendAnalysis()
     {
         return $this->trendAnalyses()
-            ->where('analysis_date', today())
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
+    public function getTodayTrendAnalysis()
+    {
+        return $this->trendAnalyses()
+            ->whereDate('created_at', today())
+            ->orderBy('created_at', 'desc')
             ->first();
     }
 }

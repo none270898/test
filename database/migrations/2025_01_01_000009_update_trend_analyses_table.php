@@ -23,7 +23,6 @@ return new class extends Migration
 
         // Now add the unique constraint
         Schema::table('trend_analyses', function (Blueprint $table) {
-            $table->unique(['cryptocurrency_id', 'analysis_date']);
             $table->index(['analysis_date', 'confidence_score']);
         });
     }
@@ -31,7 +30,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('trend_analyses', function (Blueprint $table) {
-            $table->dropUnique(['cryptocurrency_id', 'analysis_date']);
             $table->dropIndex(['analysis_date', 'confidence_score']);
             $table->dropColumn(['analysis_date', 'hourly_breakdown', 'previous_sentiment', 'sentiment_change']);
         });

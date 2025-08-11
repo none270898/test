@@ -20,11 +20,6 @@ class WatchlistController extends Controller
     {
         $user = Auth::user();
 
-        // if ($user->watchlist()->count() === 0) {
-        //     $this->sentimentService->initializeDefaultWatchlist($user);
-        // }
-
-        // Dodaj ID do odpowiedzi
         $watchlist = $user->watchlist()
             ->with('cryptocurrency')
             ->get();
@@ -34,23 +29,34 @@ class WatchlistController extends Controller
             $latestAnalysis = $crypto->getLatestTrendAnalysis();
 
             return [
-                'id' => $item->id, // DODANE ID
+                'id' => $item->id,
                 'cryptocurrency' => [
                     'id' => $crypto->id,
                     'name' => $crypto->name,
                     'symbol' => $crypto->symbol,
                     'image' => $crypto->image,
-                    'current_price_pln' => $crypto->current_price_pln,
-                    'price_change_24h' => $crypto->price_change_24h,
+                    'coingecko_id' => $crypto->coingecko_id,
+                    'current_price_pln' => $crypto->current_price_pln ?? 0,
+                    'current_price_usd' => $crypto->current_price_usd ?? 0,
+                    'price_change_24h' => $crypto->price_change_24h ?? 0,
                 ],
+                // Use aggregated fields from cryptocurrency table
                 'sentiment_avg' => $crypto->current_sentiment ?? 0,
                 'mention_count' => $crypto->daily_mentions ?? 0,
+                'sentiment_change' => $crypto->sentiment_change_24h ?? 0,
+                'trending_score' => $crypto->trending_score ?? 0,
+                'trending_status' => $crypto->getTrendingStatus(),
+                
+                // Analysis data (if available)
                 'trend_direction' => $latestAnalysis?->trend_direction ?? 'neutral',
                 'confidence_score' => $latestAnalysis?->confidence_score ?? 0,
-                'sentiment_change' => $crypto->sentiment_change_24h ?? 0,
-                'emoji' => $latestAnalysis?->getTrendEmoji() ?? '➡️',
+                'emoji' => $crypto->getSentimentEmoji(),
                 'analysis_time' => $crypto->sentiment_updated_at?->diffForHumans() ?? 'Never',
+                'has_recent_data' => $crypto->hasRecentSentimentData(24),
                 'notifications_enabled' => $item->notifications_enabled,
+                
+                // Additional insights
+                'todays_analyses_count' => $crypto->getTodayTrendAnalyses()->count(),
             ];
         });
 
