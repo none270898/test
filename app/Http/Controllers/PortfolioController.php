@@ -40,19 +40,43 @@ class PortfolioController extends Controller
                 'total_invested' => round($totalInvested, 2),
                 'profit_loss' => round($profitLoss, 2),
                 'profit_loss_percent' => round($profitLossPercent, 2),
+            ],
+            // DODANE: informacje o limitach
+            'limits' => [
+                'is_premium' => $user->isPremium(),
+                'portfolio_limit' => $user->isPremium() ? null : 10,
+                'current_count' => $holdings->count(),
+                'can_add_more' => $user->isPremium() || $holdings->count() < 10,
+                'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla nieograniczonego portfolio i zaawansowanych analytics'
             ]
         ]);
     }
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
+        // DODANE: Sprawdzenie limitów przed walidacją
+        if (!$user->isPremium() && $user->portfolioHoldings()->count() >= 10) {
+            return response()->json([
+                'error' => 'Portfolio limit reached',
+                'message' => 'Darmowy plan pozwala na śledzenie maksymalnie 10 kryptowalut.',
+                'upgrade_required' => true,
+                'current_limit' => 10,
+                'premium_benefits' => [
+                    'Nieograniczona liczba kryptowalut',
+                    'Zaawansowane wykresy i analytics',
+                    'Historia transakcji',
+                    'Export danych'
+                ]
+            ], 403);
+        }
+
         $request->validate([
             'cryptocurrency_id' => ['required', 'exists:cryptocurrencies,id'],
             'amount' => ['required', 'numeric', 'min:0.00000001'],
             'average_buy_price' => ['nullable', 'numeric', 'min:0'],
         ]);
-
-        $user = Auth::user();
 
         // Check if holding already exists
         $existingHolding = $user->portfolioHoldings()
@@ -79,7 +103,13 @@ class PortfolioController extends Controller
 
             return response()->json([
                 'message' => 'Holding updated successfully',
-                'holding' => $existingHolding->load('cryptocurrency')
+                'holding' => $existingHolding->load('cryptocurrency'),
+                // DODANE: info o limitach w odpowiedzi
+                'limits_info' => [
+                    'current_count' => $user->portfolioHoldings()->count(),
+                    'limit' => $user->isPremium() ? null : 10,
+                    'is_premium' => $user->isPremium()
+                ]
             ]);
         }
 
@@ -92,7 +122,14 @@ class PortfolioController extends Controller
 
         return response()->json([
             'message' => 'Holding added successfully',
-            'holding' => $holding->load('cryptocurrency')
+            'holding' => $holding->load('cryptocurrency'),
+            // DODANE: info o limitach w odpowiedzi
+            'limits_info' => [
+                'current_count' => $user->portfolioHoldings()->count(),
+                'limit' => $user->isPremium() ? null : 10,
+                'is_premium' => $user->isPremium(),
+                'can_add_more' => $user->isPremium() || $user->portfolioHoldings()->count() < 10
+            ]
         ], 201);
     }
 
@@ -128,6 +165,16 @@ class PortfolioController extends Controller
 
         $holding->delete();
 
-        return response()->json(['message' => 'Holding deleted successfully']);
+        $user = Auth::user();
+        
+        return response()->json([
+            'message' => 'Holding deleted successfully',
+            // DODANE: aktualne info o limitach po usunięciu
+            'limits_info' => [
+                'current_count' => $user->portfolioHoldings()->count(),
+                'limit' => $user->isPremium() ? null : 10,
+                'can_add_more' => $user->isPremium() || $user->portfolioHoldings()->count() < 10
+            ]
+        ]);
     }
 }

@@ -2,6 +2,20 @@
 
 <template>
   <div class="discovery-component">
+    <!-- DODANE: Premium banner -->
+    <div v-if="!isPremium" class="premium-banner">
+      <div class="banner-content">
+        <div class="banner-icon">🤖</div>
+        <div class="banner-text">
+          <h4>Odkryj moc AI w analizie krypto!</h4>
+          <p>Upgrade do Premium aby odblokowac pełną analizę sentiment</p>
+        </div>
+        <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+          Unlock AI Analysis
+        </button>
+      </div>
+    </div>
+
     <!-- Discovery Tabs -->
     <div class="discovery-tabs">
       <button 
@@ -21,18 +35,91 @@
         @click="activeTab = 'stats'" 
         :class="['tab-btn', { active: activeTab === 'stats' }]"
       >
-        📊 Stats
+        📊 AI Stats
       </button>
+      <button 
+        v-else
+        @click="showUpgradeModal = true"
+        class="tab-btn tab-locked"
+      >
+        📊 AI Stats 🔒
+      </button>
+    </div>
+
+    <!-- DODANE: Upgrade Modal -->
+    <div v-if="showUpgradeModal" class="modal-overlay" @click="closeUpgradeModal">
+      <div class="modal-content upgrade-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🚀 Unlock AI Discovery</h3>
+          <button @click="closeUpgradeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="upgrade-content">
+          <div class="upgrade-benefits">
+            <h4>AI Discovery Premium Features:</h4>
+            <ul>
+              <li>✅ AI sentiment analysis per crypto</li>
+              <li>✅ Detailed trending scores</li>
+              <li>✅ Confidence indicators</li>
+              <li>✅ Trend predictions</li>
+              <li>✅ Historical sentiment data</li>
+              <li>✅ AI-powered insights</li>
+            </ul>
+            <div class="feature-comparison">
+              <div class="comparison-table">
+                <div class="comparison-header">
+                  <span>Feature</span>
+                  <span>Free</span>
+                  <span>Premium</span>
+                </div>
+                <div class="comparison-row">
+                  <span>Basic prices</span>
+                  <span class="feature-yes">✅</span>
+                  <span class="feature-yes">✅</span>
+                </div>
+                <div class="comparison-row">
+                  <span>AI Sentiment</span>
+                  <span class="feature-no">❌</span>
+                  <span class="feature-yes">✅</span>
+                </div>
+                <div class="comparison-row">
+                  <span>Trending scores</span>
+                  <span class="feature-limited">Basic</span>
+                  <span class="feature-yes">Full</span>
+                </div>
+                <div class="comparison-row">
+                  <span>History charts</span>
+                  <span class="feature-no">❌</span>
+                  <span class="feature-yes">✅</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="upgrade-pricing">
+            <div class="price">19 PLN/miesiąc</div>
+            <button class="btn btn-premium btn-large">
+              Aktywuj Premium
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Trending Tab -->
     <div v-if="activeTab === 'trending'" class="tab-content">
       <div class="section-header">
         <h4>🔥 Trending Cryptocurrencies</h4>
-        <button @click="loadTrending" :disabled="loading" class="btn btn-small btn-secondary">
-          <span v-if="loading">Loading...</span>
-          <span v-else>🔄 Refresh</span>
-        </button>
+        <div class="header-actions">
+          <button @click="loadTrending" :disabled="loading" class="btn btn-small btn-secondary">
+            <span v-if="loading">Loading...</span>
+            <span v-else>🔄 Refresh</span>
+          </button>
+          <span v-if="!isPremium" class="access-level-badge">
+            Basic Access
+          </span>
+          <span v-else class="access-level-badge premium">
+            AI Access
+          </span>
+        </div>
       </div>
 
       <div v-if="loading && trending.length === 0" class="loading-state">
@@ -43,8 +130,13 @@
       <div v-else-if="trending.length === 0" class="empty-state">
         <div class="empty-icon">📈</div>
         <h3>No trending data available</h3>
-        <p>AI analysis will appear here once we collect enough data</p>
-        <button @click="loadTrending" class="btn btn-primary">Refresh Data</button>
+        <p>{{ isPremium ? 'AI analysis will appear here once we collect enough data' : 'Upgrade to Premium for AI trending analysis' }}</p>
+        <button v-if="!isPremium" @click="showUpgradeModal = true" class="btn btn-premium">
+          Unlock AI Analysis
+        </button>
+        <button v-else @click="loadTrending" class="btn btn-primary">
+          Refresh Data
+        </button>
       </div>
 
       <div v-else class="trending-grid">
@@ -62,8 +154,15 @@
                 <span class="crypto-symbol">{{ crypto.symbol.toUpperCase() }}</span>
               </div>
             </div>
+            
+            <!-- ZMIENIONE: Różne badges dla Free vs Premium -->
             <div class="trending-badge">
-              <span class="trending-score">{{ crypto.trending_score }}</span>
+              <span v-if="isPremium && crypto.trending_score" class="trending-score">
+                {{ crypto.trending_score }}
+              </span>
+              <span v-else-if="crypto.trending_tier" class="trending-tier" :class="'tier-' + crypto.trending_tier">
+                {{ getTrendingTierText(crypto.trending_tier) }}
+              </span>
               <span class="trending-emoji">{{ crypto.emoji }}</span>
             </div>
           </div>
@@ -78,26 +177,43 @@
                 </span>
               </div>
               
+              <!-- ZMIENIONE: Sentiment tylko dla Premium -->
               <div class="metric">
-                <label>Sentiment</label>
-                <span class="metric-value" :class="getSentimentClass(crypto.current_sentiment)">
+                <label>{{ isPremium ? 'AI Sentiment' : 'Sentiment' }}</label>
+                <span v-if="isPremium && crypto.current_sentiment !== null" class="metric-value" :class="getSentimentClass(crypto.current_sentiment)">
                   {{ formatSentiment(crypto.current_sentiment) }}
                 </span>
-                <span v-if="crypto.sentiment_change_24h" class="sentiment-change" :class="getSentimentClass(crypto.sentiment_change_24h)">
-                  {{ formatSentiment(crypto.sentiment_change_24h, true) }}
+                <span v-else class="metric-locked">
+                  🔒 Premium
                 </span>
               </div>
             </div>
 
             <div class="metric-row">
               <div class="metric">
-                <label>Mentions</label>
-                <span class="metric-value">{{ crypto.daily_mentions }}</span>
+                <label>{{ isPremium ? 'Mentions' : 'Activity' }}</label>
+                <span v-if="isPremium && crypto.daily_mentions !== null" class="metric-value">
+                  {{ crypto.daily_mentions }}
+                </span>
+                <span v-else-if="crypto.has_sentiment_data" class="metric-hint">
+                  📊 Active
+                </span>
+                <span v-else class="metric-hint">
+                  😴 Quiet
+                </span>
               </div>
               
               <div class="metric">
-                <label>Confidence</label>
-                <span class="metric-value">{{ crypto.confidence_score }}%</span>
+                <label>{{ isPremium ? 'Confidence' : 'Trend' }}</label>
+                <span v-if="isPremium && crypto.confidence_score" class="metric-value">
+                  {{ crypto.confidence_score }}%
+                </span>
+                <span v-else-if="crypto.trending_tier" class="metric-trend" :class="'trend-' + crypto.trending_tier">
+                  {{ getTrendingTierEmoji(crypto.trending_tier) }}
+                </span>
+                <span v-else class="metric-locked">
+                  🔒
+                </span>
               </div>
             </div>
           </div>
@@ -126,8 +242,44 @@
               >
                 📈 History
               </button>
+              <button 
+                v-else
+                @click="showUpgradeModal = true"
+                class="btn-mini btn-premium"
+              >
+                🔒 History
+              </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- DODANE: Free users showcase -->
+      <div v-if="!isPremium" class="free-users-showcase">
+        <div class="showcase-content">
+          <h4>💡 Chcesz więcej insights?</h4>
+          <p>Premium odkrywa ukryte trendy z AI analysis polskich społeczności krypto</p>
+          <div class="showcase-features">
+            <div class="feature-item">
+              <span class="feature-icon">🧠</span>
+              <span>AI Sentiment per crypto</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📊</span>
+              <span>Detailed scores</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📈</span>
+              <span>History charts</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">🎯</span>
+              <span>Confidence indicators</span>
+            </div>
+          </div>
+          <button @click="showUpgradeModal = true" class="btn btn-premium">
+            Upgrade za 19 PLN/miesiąc
+          </button>
         </div>
       </div>
     </div>
@@ -162,9 +314,22 @@
             <div class="result-metrics">
               <span class="price">{{ formatPLN(crypto.current_price_pln) }}</span>
               <div class="sentiment-info">
-                <span v-if="crypto.daily_mentions > 0" class="mentions">{{ crypto.daily_mentions }} mentions</span>
-                <span v-if="crypto.current_sentiment" class="sentiment" :class="getSentimentClass(crypto.current_sentiment)">
+                <!-- ZMIENIONE: Różne wyświetlanie dla Free vs Premium -->
+                <span v-if="isPremium && crypto.daily_mentions > 0" class="mentions">
+                  {{ crypto.daily_mentions }} mentions
+                </span>
+                <span v-else-if="crypto.has_sentiment_data" class="mentions-hint">
+                  📊 Has activity
+                </span>
+                <span v-else class="mentions-hint">
+                  😴 Quiet
+                </span>
+                
+                <span v-if="isPremium && crypto.current_sentiment" class="sentiment" :class="getSentimentClass(crypto.current_sentiment)">
                   {{ formatSentiment(crypto.current_sentiment) }}
+                </span>
+                <span v-else class="sentiment-locked">
+                  🔒 Premium
                 </span>
               </div>
             </div>
@@ -194,11 +359,28 @@
       </div>
     </div>
 
-    <!-- Stats Tab (Premium) -->
-    <div v-if="activeTab === 'stats' && isPremium" class="tab-content">
-      <div v-if="loadingStats" class="loading-state">
+    <!-- Stats Tab (Premium only) -->
+    <div v-if="activeTab === 'stats'" class="tab-content">
+      <div v-if="!isPremium" class="premium-required">
+        <div class="premium-lock">
+          <div class="lock-icon">🔒</div>
+          <h3>AI Discovery Stats</h3>
+          <p>Zaawansowane statystyki i analizy dostępne tylko dla Premium</p>
+          <div class="preview-features">
+            <div class="preview-item">📊 Market sentiment overview</div>
+            <div class="preview-item">🚀 Top performers analysis</div>
+            <div class="preview-item">💬 Source activity breakdown</div>
+            <div class="preview-item">📈 Trending distribution</div>
+          </div>
+          <button @click="showUpgradeModal = true" class="btn btn-premium">
+            Unlock AI Stats
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="loadingStats" class="loading-state">
         <div class="loading-spinner"></div>
-        <p>Loading discovery stats...</p>
+        <p>Loading AI discovery stats...</p>
       </div>
 
       <div v-else class="stats-content">
@@ -254,7 +436,7 @@
       </div>
     </div>
 
-    <!-- History Modal -->
+    <!-- History Modal - Premium only -->
     <div v-if="showHistoryModal" class="modal-overlay" @click="showHistoryModal = false">
       <div class="modal-content history-modal" @click.stop>
         <div class="modal-header">
@@ -262,8 +444,12 @@
           <button @click="showHistoryModal = false" class="close-btn">&times;</button>
         </div>
         <div class="history-content">
-          <p>Historical sentiment analysis will be displayed here</p>
-          <!-- This would contain a chart component -->
+          <p v-if="!isPremium">Upgrade to Premium to view sentiment history</p>
+          <crypto-history-component 
+            v-else-if="selectedCrypto"
+            :coin-gecko-id="selectedCrypto.coingecko_id"
+            :crypto-name="selectedCrypto.name"
+          ></crypto-history-component>
         </div>
       </div>
     </div>
@@ -291,8 +477,10 @@ export default {
       loadingStats: false,
       searchTimeout: null,
       showHistoryModal: false,
+      showUpgradeModal: false, // DODANE
       selectedCrypto: null,
-      isPremium: false
+      isPremium: false,
+      accessLevel: null
     }
   },
   async mounted() {
@@ -314,6 +502,7 @@ export default {
       try {
         const response = await window.axios.get('/api/discovery/trending?limit=20');
         this.trending = response.data.trending;
+        this.accessLevel = response.data.access_level;
       } catch (error) {
         console.error('Error loading trending:', error);
         this.showError('Failed to load trending cryptocurrencies');
@@ -354,7 +543,13 @@ export default {
         this.stats = response.data;
       } catch (error) {
         console.error('Error loading stats:', error);
-        this.showError('Failed to load discovery stats');
+        
+        // DODANE: obsługa błędów Premium
+        if (error.response && error.response.status === 403) {
+          this.showUpgradeModal = true;
+        } else {
+          this.showError('Failed to load discovery stats');
+        }
       } finally {
         this.loadingStats = false;
       }
@@ -367,28 +562,70 @@ export default {
           notifications_enabled: true
         });
         
-        // Update the local state
         crypto.is_watchlisted = true;
-        
         this.$emit('crypto-added', crypto);
         this.showSuccess(`${crypto.name} added to watchlist`);
       } catch (error) {
         console.error('Error adding to watchlist:', error);
-        this.showError('Failed to add to watchlist');
+        
+        // DODANE: obsługa błędów limitów
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.showError(error.response.data.message);
+        } else {
+          this.showError('Failed to add to watchlist');
+        }
       }
     },
 
     showHistory(crypto) {
+      if (!this.isPremium) {
+        this.showUpgradeModal = true;
+        return;
+      }
       this.selectedCrypto = crypto;
       this.showHistoryModal = true;
     },
 
-    getTrendingCardClass(crypto) {
-      return {
-        'trending-positive': crypto.current_sentiment > 0.1,
-        'trending-negative': crypto.current_sentiment < -0.1,
-        'trending-hot': crypto.trending_score > 50
+    // DODANE: nowe metody
+    closeUpgradeModal() {
+      this.showUpgradeModal = false;
+    },
+
+    getTrendingTierText(tier) {
+      const texts = {
+        'hot': 'HOT',
+        'trending': 'UP',
+        'moderate': 'OK',
+        'low': 'LOW'
       };
+      return texts[tier] || 'N/A';
+    },
+
+    getTrendingTierEmoji(tier) {
+      const emojis = {
+        'hot': '🔥',
+        'trending': '📈',
+        'moderate': '📊',
+        'low': '😴'
+      };
+      return emojis[tier] || '❓';
+    },
+
+    getTrendingCardClass(crypto) {
+      if (this.isPremium) {
+        return {
+          'trending-positive': crypto.current_sentiment > 0.1,
+          'trending-negative': crypto.current_sentiment < -0.1,
+          'trending-hot': crypto.trending_score > 50
+        };
+      } else {
+        return {
+          'trending-hot': crypto.trending_tier === 'hot',
+          'trending-up': crypto.trending_tier === 'trending',
+          'trending-locked': true
+        };
+      }
     },
 
     getSentimentClass(sentiment) {
@@ -438,6 +675,8 @@ export default {
     activeTab(newTab) {
       if (newTab === 'stats' && this.isPremium && Object.keys(this.stats).length === 0) {
         this.loadStats();
+      } else if (newTab === 'stats' && !this.isPremium) {
+        // Tab zostanie pokazany z premium lock
       }
     }
   }

@@ -1,12 +1,32 @@
 <template>
   <div class="watchlist-component">
+    <!-- DODANE: Premium upgrade banner -->
+    <div v-if="!isPremium && watchlistLimits.current_count >= 12" class="limit-warning-banner">
+      <div class="banner-content">
+        <div class="banner-icon">🎯</div>
+        <div class="banner-text">
+          <h4>Zbliżasz się do limitu watchlist!</h4>
+          <p>{{ watchlistLimits.current_count }}/{{ watchlistLimits.watchlist_limit }} pozycji + brak AI sentiment</p>
+        </div>
+        <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+          Unlock AI Features
+        </button>
+      </div>
+    </div>
+
     <!-- Header with Add Button -->
     <div class="watchlist-header">
       <h3>🎯 My Crypto Watchlist</h3>
       <div class="header-actions">
-        <button @click="showAddModal = true" class="btn btn-primary">
+        <button 
+          @click="showAddModal = true" 
+          :disabled="!canAddMore"
+          class="btn btn-primary"
+          :class="{ 'btn-disabled': !canAddMore }"
+        >
           <span class="btn-icon">+</span>
           Add Crypto
+          <span v-if="!isPremium" class="btn-limit">({{ watchlistLimits.current_count }}/{{ watchlistLimits.watchlist_limit }})</span>
         </button>
         <button
           @click="showDiscovery = !showDiscovery"
@@ -15,12 +35,61 @@
           <span class="btn-icon">🔍</span>
           {{ showDiscovery ? "Hide" : "Discover" }}
         </button>
+        <!-- DODANE: Premium button -->
+        <button 
+          v-if="!isPremium"
+          @click="showUpgradeModal = true"
+          class="btn btn-premium btn-small"
+        >
+          🚀 Premium
+        </button>
       </div>
     </div>
 
     <!-- Discovery Section -->
     <div v-if="showDiscovery" class="discovery-section">
       <discovery-component @crypto-added="onCryptoAdded"></discovery-component>
+    </div>
+
+    <!-- DODANE: Upgrade Modal -->
+    <div v-if="showUpgradeModal" class="modal-overlay" @click="closeUpgradeModal">
+      <div class="modal-content upgrade-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🚀 Unlock Watchlist Premium</h3>
+          <button @click="closeUpgradeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="upgrade-content">
+          <div class="upgrade-benefits">
+            <h4>Watchlist Premium Features:</h4>
+            <ul>
+              <li>✅ Nieograniczona liczba pozycji</li>
+              <li>✅ AI sentiment tracking</li>
+              <li>✅ Sentiment notifications</li>
+              <li>✅ Trend analysis i prognozy</li>
+              <li>✅ Zaawansowane insights</li>
+              <li>✅ Portfolio sentiment overview</li>
+            </ul>
+            <div class="feature-comparison">
+              <div class="comparison-row">
+                <span class="feature-name">Pozycje w watchlist</span>
+                <span class="free-value">15</span>
+                <span class="premium-value">∞ Unlimited</span>
+              </div>
+              <div class="comparison-row">
+                <span class="feature-name">AI Sentiment</span>
+                <span class="free-value">❌</span>
+                <span class="premium-value">✅ Full access</span>
+              </div>
+            </div>
+          </div>
+          <div class="upgrade-pricing">
+            <div class="price">19 PLN/miesiąc</div>
+            <button class="btn btn-premium btn-large">
+              Aktywuj Premium
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Watchlist Content -->
@@ -34,12 +103,19 @@
         <div class="empty-icon">🎯</div>
         <h3>Your watchlist is empty</h3>
         <p>
-          Add cryptocurrencies to track their sentiment and get personalized
-          insights
+          Add cryptocurrencies to track their prices{{ isPremium ? ' and AI sentiment' : '' }}
         </p>
-        <button @click="initializeDefaultWatchlist" class="btn btn-primary">
-          Add Popular Cryptos
-        </button>
+        <div class="empty-actions">
+          <button @click="initializeDefaultWatchlist" class="btn btn-primary">
+            Add Popular Cryptos
+          </button>
+          <div v-if="!isPremium" class="limit-info">
+            <p>Darmowy plan: do {{ watchlistLimits.watchlist_limit }} pozycji (bez AI sentiment)</p>
+            <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+              Unlock AI Sentiment Tracking
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="watchlist-grid">
@@ -68,9 +144,10 @@
 
             <div class="card-actions">
               <button
+                v-if="isPremium"
                 @click="showCryptoHistory(item.cryptocurrency)"
                 class="btn btn-small btn-ghost"
-                title="View History"
+                title="View Sentiment History"
               >
                 📈
               </button>
@@ -97,47 +174,62 @@
             </div>
           </div>
 
-          <!-- Sentiment Info -->
+          <!-- Sentiment Info - ZMIENIONE: z premium lock -->
           <div class="sentiment-section">
-            <div class="sentiment-row">
-              <label>Sentiment</label>
-              <div class="sentiment-value">
-                <span class="sentiment-emoji">{{ item.emoji }}</span>
+            <div v-if="isPremium && item.sentiment_access" class="sentiment-content">
+              <div class="sentiment-row">
+                <label>AI Sentiment</label>
+                <div class="sentiment-value">
+                  <span class="sentiment-emoji">{{ item.emoji }}</span>
+                  <span
+                    class="sentiment-score"
+                    :class="getSentimentClass(item.sentiment_avg)"
+                  >
+                    {{ formatSentiment(item.sentiment_avg) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="metrics-row">
+                <div class="metric">
+                  <label>Mentions</label>
+                  <span class="metric-value">{{ item.mention_count }}</span>
+                </div>
+                <div class="metric">
+                  <label>Confidence</label>
+                  <span class="metric-value">{{ item.confidence_score }}%</span>
+                </div>
+              </div>
+
+              <div v-if="item.sentiment_change !== 0" class="sentiment-change">
+                <span class="change-label">24h change:</span>
                 <span
-                  class="sentiment-score"
-                  :class="getSentimentClass(item.sentiment_avg)"
+                  class="change-value"
+                  :class="getSentimentClass(item.sentiment_change)"
                 >
-                  {{ formatSentiment(item.sentiment_avg) }}
+                  {{ formatSentimentChange(item.sentiment_change) }}
                 </span>
               </div>
             </div>
 
-            <div class="metrics-row">
-              <div class="metric">
-                <label>Mentions</label>
-                <span class="metric-value">{{ item.mention_count }}</span>
+            <!-- DODANE: Premium lock dla sentiment -->
+            <div v-else class="sentiment-locked">
+              <div class="lock-content">
+                <div class="lock-icon">🔒</div>
+                <div class="lock-text">
+                  <h5>AI Sentiment Analysis</h5>
+                  <p>Upgrade to Premium to unlock sentiment tracking</p>
+                </div>
               </div>
-              <div class="metric">
-                <label>Confidence</label>
-                <span class="metric-value">{{ item.confidence_score }}%</span>
-              </div>
-            </div>
-
-            <!-- Sentiment Change -->
-            <div v-if="item.sentiment_change !== 0" class="sentiment-change">
-              <span class="change-label">24h change:</span>
-              <span
-                class="change-value"
-                :class="getSentimentClass(item.sentiment_change)"
-              >
-                {{ formatSentimentChange(item.sentiment_change) }}
-              </span>
+              <button @click="showUpgradeModal = true" class="btn btn-premium btn-mini">
+                Unlock
+              </button>
             </div>
           </div>
 
           <!-- Card Footer -->
           <div class="card-footer">
-            <span class="update-time">{{ item.analysis_time }}</span>
+            <span class="update-time">{{ isPremium && item.analysis_time ? item.analysis_time : 'Price updated live' }}</span>
             <div class="notification-toggle">
               <label class="toggle-switch">
                 <input
@@ -147,9 +239,37 @@
                 />
                 <span class="toggle-slider"></span>
               </label>
-              <span class="toggle-label">Alerts</span>
+              <span class="toggle-label">{{ isPremium ? 'Smart Alerts' : 'Price Alerts' }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- DODANE: Premium features showcase dla darmowych użytkowników -->
+      <div v-if="!isPremium && watchlist.length > 0" class="premium-showcase">
+        <div class="showcase-content">
+          <h4>🤖 Chcesz więcej insights? Premium oferuje:</h4>
+          <div class="feature-grid">
+            <div class="feature-item">
+              <span class="feature-icon">🧠</span>
+              <span class="feature-text">AI Sentiment per crypto</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📊</span>
+              <span class="feature-text">Trend Analysis</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">∞</span>
+              <span class="feature-text">Unlimited Watchlist</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">🔔</span>
+              <span class="feature-text">Sentiment Alerts</span>
+            </div>
+          </div>
+          <button @click="showUpgradeModal = true" class="btn btn-premium">
+            Upgrade za 19 PLN/miesiąc
+          </button>
         </div>
       </div>
     </div>
@@ -160,6 +280,22 @@
         <div class="modal-header">
           <h3>Add to Watchlist</h3>
           <button @click="closeAddModal" class="close-btn">&times;</button>
+        </div>
+
+        <!-- DODANE: Limit info w modal -->
+        <div v-if="!isPremium" class="modal-limit-info">
+          <div class="limit-progress">
+            <span class="limit-text">Watchlist: {{ watchlistLimits.current_count }}/{{ watchlistLimits.watchlist_limit }}</span>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ width: (watchlistLimits.current_count / watchlistLimits.watchlist_limit * 100) + '%' }"
+              ></div>
+            </div>
+          </div>
+          <div class="premium-features-hint">
+            <p><strong>Premium:</strong> Unlimited watchlist + AI sentiment tracking</p>
+          </div>
         </div>
 
         <div class="modal-body">
@@ -195,15 +331,19 @@
                   <div class="price">
                     {{ formatPLN(crypto.current_price_pln) }}
                   </div>
-                  <div class="mentions">
+                  <div class="mentions" v-if="isPremium">
                     {{ crypto.daily_mentions }} mentions
+                  </div>
+                  <div class="mentions" v-else>
+                    🔒 AI data
                   </div>
                 </div>
                 <div class="action-area">
                   <span v-if="crypto.is_watchlisted" class="already-added-label"
                     >✓ Added</span
                   >
-                  <button v-else class="btn btn-small btn-primary">Add</button>
+                  <button v-else-if="canAddMore" class="btn btn-small btn-primary">Add</button>
+                  <span v-else class="limit-reached">Limit reached</span>
                 </div>
               </div>
             </div>
@@ -216,9 +356,9 @@
       </div>
     </div>
 
-    <!-- Crypto History Modal -->
+    <!-- Crypto History Modal - tylko dla Premium -->
     <div
-      v-if="selectedCryptoHistory"
+      v-if="selectedCryptoHistory && isPremium"
       class="modal-overlay"
       @click="closeCryptoHistory"
     >
@@ -259,12 +399,36 @@ export default {
       watchlist: [],
       loading: false,
       showAddModal: false,
+      showUpgradeModal: false, // DODANE
       showDiscovery: false,
       searchQuery: "",
       searchResults: [],
       searchTimeout: null,
       selectedCryptoHistory: null,
+      // DODANE: limity watchlist
+      watchlistLimits: {
+        is_premium: false,
+        watchlist_limit: 15,
+        current_count: 0,
+        can_add_more: true,
+        sentiment_access: false
+      },
+      premiumFeatures: {
+        unlimited_watchlist: false,
+        sentiment_tracking: false,
+        sentiment_notifications: false,
+        trend_analysis: false,
+        ai_insights: false
+      }
     };
+  },
+  computed: {
+    isPremium() {
+      return this.watchlistLimits.is_premium;
+    },
+    canAddMore() {
+      return this.watchlistLimits.can_add_more;
+    }
   },
   async mounted() {
     await this.loadWatchlist();
@@ -275,12 +439,133 @@ export default {
       try {
         const response = await window.axios.get("/api/watchlist");
         this.watchlist = response.data.watchlist;
+        
+        // DODANE: wczytanie limitów
+        this.watchlistLimits = response.data.limits || {
+          is_premium: false,
+          watchlist_limit: 15,
+          current_count: 0,
+          can_add_more: true,
+          sentiment_access: false
+        };
+        
+        this.premiumFeatures = response.data.premium_features || {};
+        
         this.$emit("watchlist-updated", response.data.total_count);
       } catch (error) {
         console.error("Error loading watchlist:", error);
         this.showError("Failed to load watchlist");
       } finally {
         this.loading = false;
+      }
+    },
+
+    async addToWatchlist(crypto) {
+      try {
+        const response = await window.axios.post("/api/watchlist", {
+          cryptocurrency_id: crypto.id,
+          notifications_enabled: true,
+        });
+
+        // DODANE: aktualizacja limitów po dodaniu
+        if (response.data.limits_info) {
+          this.watchlistLimits = {
+            ...this.watchlistLimits,
+            ...response.data.limits_info
+          };
+        }
+
+        this.showSuccess(`${crypto.name} added to watchlist`);
+        await this.loadWatchlist();
+
+        crypto.is_watchlisted = true;
+      } catch (error) {
+        console.error("Error adding to watchlist:", error);
+        
+        // DODANE: obsługa błędów limitów
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.closeAddModal();
+          this.showError(error.response.data.message);
+        } else {
+          this.showError("Failed to add to watchlist");
+        }
+      }
+    },
+
+    async removeCrypto(watchlistItem) {
+      const cryptoName = watchlistItem.cryptocurrency.name;
+
+      if (!confirm(`Remove ${cryptoName} from your watchlist?`)) {
+        return;
+      }
+
+      try {
+        const response = await window.axios.delete(`/api/watchlist/${watchlistItem.id}`);
+
+        // DODANE: aktualizacja limitów po usunięciu
+        if (response.data.limits_info) {
+          this.watchlistLimits = {
+            ...this.watchlistLimits,
+            ...response.data.limits_info
+          };
+        }
+
+        this.showSuccess(`${cryptoName} removed from watchlist`);
+        await this.loadWatchlist();
+      } catch (error) {
+        console.error("Error removing from watchlist:", error);
+        this.showError("Failed to remove from watchlist");
+      }
+    },
+
+    async toggleNotifications(watchlistItem, event) {
+      try {
+        await window.axios.put(`/api/watchlist/${watchlistItem.id}`, {
+          notifications_enabled: event.target.checked,
+        });
+
+        const status = event.target.checked ? "enabled" : "disabled";
+        const alertType = this.isPremium ? "smart alerts" : "price alerts";
+        this.showSuccess(`${alertType} ${status} for ${watchlistItem.cryptocurrency.name}`);
+      } catch (error) {
+        console.error("Error updating notifications:", error);
+        this.showError("Failed to update notification settings");
+        event.target.checked = !event.target.checked;
+      }
+    },
+
+    async initializeDefaultWatchlist() {
+      try {
+        const response = await window.axios.get("/api/discovery/trending?limit=10");
+        const topCryptos = response.data.trending.slice(0, 10);
+
+        const cryptoIds = topCryptos.map((crypto) => crypto.id);
+        const bulkResponse = await window.axios.post("/api/watchlist/bulk-add", {
+          cryptocurrency_ids: cryptoIds,
+          notifications_enabled: true,
+        });
+
+        // DODANE: aktualizacja limitów po bulk add
+        if (bulkResponse.data.limits_info) {
+          this.watchlistLimits = {
+            ...this.watchlistLimits,
+            ...bulkResponse.data.limits_info
+          };
+        }
+
+        this.showSuccess("Added popular cryptocurrencies to your watchlist!");
+        await this.loadWatchlist();
+      } catch (error) {
+        console.error("Error initializing watchlist:", error);
+        
+        // DODANE: obsługa błędów limitów przy bulk add
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.showError(error.response.data.message);
+        } else {
+          this.showError("Failed to initialize watchlist");
+        }
       }
     },
 
@@ -304,85 +589,11 @@ export default {
       }, 300);
     },
 
-    async addToWatchlist(crypto) {
-      try {
-        await window.axios.post("/api/watchlist", {
-          cryptocurrency_id: crypto.id,
-          notifications_enabled: true,
-        });
-
-        this.showSuccess(`${crypto.name} added to watchlist`);
-        await this.loadWatchlist();
-
-        // Update search results to reflect the change
-        crypto.is_watchlisted = true;
-      } catch (error) {
-        console.error("Error adding to watchlist:", error);
-        this.showError("Failed to add to watchlist");
-      }
-    },
-
-    async removeCrypto(watchlistItem) {
-      const cryptoName = watchlistItem.cryptocurrency.name;
-
-      if (!confirm(`Remove ${cryptoName} from your watchlist?`)) {
+    showCryptoHistory(crypto) {
+      if (!this.isPremium) {
+        this.showUpgradeModal = true;
         return;
       }
-
-      try {
-        // Użyj ID z watchlistItem
-        await window.axios.delete(`/api/watchlist/${watchlistItem.id}`);
-
-        this.showSuccess(`${cryptoName} removed from watchlist`);
-        await this.loadWatchlist();
-      } catch (error) {
-        console.error("Error removing from watchlist:", error);
-        this.showError("Failed to remove from watchlist");
-      }
-    },
-
-    async toggleNotifications(watchlistItem, event) {
-      try {
-        // Użyj ID z watchlistItem
-        await window.axios.put(`/api/watchlist/${watchlistItem.id}`, {
-          notifications_enabled: event.target.checked,
-        });
-
-        const status = event.target.checked ? "enabled" : "disabled";
-        this.showSuccess(
-          `Notifications ${status} for ${watchlistItem.cryptocurrency.name}`
-        );
-      } catch (error) {
-        console.error("Error updating notifications:", error);
-        this.showError("Failed to update notification settings");
-        // Revert checkbox
-        event.target.checked = !event.target.checked;
-      }
-    },
-
-    async initializeDefaultWatchlist() {
-      try {
-        // Get top 10 cryptos and add them
-        const response = await window.axios.get(
-          "/api/discovery/trending?limit=10"
-        );
-        const topCryptos = response.data.trending.slice(0, 10);
-
-        const cryptoIds = topCryptos.map((crypto) => crypto.id);
-        await window.axios.post("/api/watchlist/bulk-add", {
-          cryptocurrency_ids: cryptoIds,
-          notifications_enabled: true,
-        });
-
-        this.showSuccess("Added popular cryptocurrencies to your watchlist!");
-        await this.loadWatchlist();
-      } catch (error) {
-        console.error("Error initializing watchlist:", error);
-        this.showError("Failed to initialize watchlist");
-      }
-    },
-
-    showCryptoHistory(crypto) {
       this.selectedCryptoHistory = { cryptocurrency: crypto };
     },
 
@@ -401,7 +612,16 @@ export default {
       this.searchResults = [];
     },
 
+    // DODANE: nowa metoda
+    closeUpgradeModal() {
+      this.showUpgradeModal = false;
+    },
+
     getWatchlistCardClass(item) {
+      if (!this.isPremium || !item.sentiment_access) {
+        return { 'card-locked': true };
+      }
+      
       return {
         "card-bullish": item.trend_direction === "up",
         "card-bearish": item.trend_direction === "down",
@@ -462,6 +682,278 @@ export default {
 <style scoped>
 .watchlist-component {
   width: 100%;
+}
+
+/* DODANE: Style dla limitów i upgrade */
+.limit-warning-banner {
+  background: linear-gradient(135deg, #fef3cd, #fde68a);
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.banner-icon {
+  font-size: 1.5rem;
+}
+
+.banner-text h4 {
+  margin: 0;
+  color: #92400e;
+  font-size: 1rem;
+}
+
+.banner-text p {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.9rem;
+}
+
+.modal-limit-info {
+  background: #f8fafc;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.limit-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.limit-text {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  transition: width 0.3s ease;
+}
+
+.premium-features-hint {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.premium-features-hint p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.upgrade-modal {
+  max-width: 600px;
+}
+
+.upgrade-content {
+  padding: 1rem 0;
+}
+
+.upgrade-benefits {
+  margin-bottom: 2rem;
+}
+
+.upgrade-benefits h4 {
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.upgrade-benefits ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 1.5rem;
+}
+
+.upgrade-benefits li {
+  padding: 0.5rem 0;
+  color: #64748b;
+}
+
+.feature-comparison {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.comparison-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.comparison-row:last-child {
+  border-bottom: none;
+}
+
+.feature-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.free-value {
+  color: #64748b;
+  font-size: 0.9rem;
+  text-align: center;
+  min-width: 60px;
+}
+
+.premium-value {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+  min-width: 80px;
+}
+
+.upgrade-pricing {
+  text-align: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+}
+
+.price {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.sentiment-locked {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 2px dashed #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.lock-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.lock-icon {
+  font-size: 2rem;
+  color: #64748b;
+}
+
+.lock-text h5 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1rem;
+}
+
+.lock-text p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.card-locked {
+  border-color: #e2e8f0;
+  opacity: 0.9;
+}
+
+.premium-showcase {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+  border: 2px dashed #e2e8f0;
+  text-align: center;
+}
+
+.showcase-content h4 {
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.feature-icon {
+  font-size: 1.5rem;
+}
+
+.feature-text {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.btn-premium {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+}
+
+.btn-premium:hover {
+  background: linear-gradient(135deg, #7c3aed, #5b5cf1);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4);
+}
+
+.btn-mini {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-limit {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.limit-reached {
+  color: #ef4444;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .watchlist-header {
@@ -612,6 +1104,10 @@ export default {
 
 .sentiment-section {
   margin-bottom: 1rem;
+}
+
+.sentiment-content {
+  /* Style dla zwykłej sentiment content */
 }
 
 .sentiment-row {
@@ -968,6 +1464,11 @@ input:checked + .toggle-slider:before {
   font-size: 0.875rem;
 }
 
+.btn-large {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
 .btn-ghost {
   background: transparent;
   color: #64748b;
@@ -1033,6 +1534,27 @@ input:checked + .toggle-slider:before {
   margin-bottom: 2rem;
 }
 
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.limit-info {
+  text-align: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.limit-info p {
+  margin: 0 0 0.5rem 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .watchlist-header {
@@ -1062,6 +1584,21 @@ input:checked + .toggle-slider:before {
   .metrics-row {
     grid-template-columns: 1fr;
     gap: 0.5rem;
+  }
+
+  .banner-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    text-align: center;
   }
 }
 </style>

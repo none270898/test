@@ -15,39 +15,107 @@ class DiscoveryController extends Controller
     }
 
     /**
-     * Get trending cryptocurrencies for discovery
+     * Get trending cryptocurrencies with premium-based access
      */
     public function trending(Request $request)
     {
         $limit = min($request->get('limit', 20), 50);
+        $user = Auth::user();
         $trending = $this->sentimentService->getTrendingCryptos($limit);
 
         // Mark which ones are already in user's watchlist
-        $user = Auth::user();
         $watchlistIds = $user->watchlist()->pluck('cryptocurrency_id')->toArray();
 
-        $trendingWithWatchlistStatus = array_map(function ($item) use ($watchlistIds) {
+        $trendingWithAccess = array_map(function ($item) use ($watchlistIds, $user) {
             $item['is_watchlisted'] = in_array($item['id'], $watchlistIds);
+            
+            // ZMIENIONE: Ograniczone dane sentiment dla darmowych użytkowników
+            if (!$user->isPremium()) {
+                // Podstawowe dane dostępne dla wszystkich
+                $basicData = [
+                    'id' => $item['id'],
+                    'coingecko_id' => $item['coingecko_id'],
+                    'name' => $item['name'],
+                    'symbol' => $item['symbol'],
+                    'image' => $item['image'],
+                    'current_price_pln' => $item['current_price_pln'],
+                    'price_change_24h' => $item['price_change_24h'],
+                    'is_watchlisted' => $item['is_watchlisted'],
+                    
+                    // DODANE: Ograniczone sentiment info
+                    'has_sentiment_data' => isset($item['daily_mentions']) && $item['daily_mentions'] > 0,
+                    'trending_tier' => $this->getTrendingTier($item['trending_score'] ?? 0),
+                    'premium_required' => true,
+                    
+                    // Null dla premium-only data
+                    'daily_mentions' => null,
+                    'current_sentiment' => null,
+                    'sentiment_change_24h' => null,
+                    'trending_score' => null,
+                    'confidence_score' => null,
+                    'trend_direction' => null,
+                    'emoji' => '🔒',
+                    'updated_at' => $item['updated_at'] ?? 'Live prices',
+                ];
+                
+                return $basicData;
+            }
+            
+            // Pełne dane dla Premium
             return $item;
         }, $trending);
 
         return response()->json([
-            'trending' => $trendingWithWatchlistStatus,
-            'total_count' => count($trendingWithWatchlistStatus),
+            'trending' => $trendingWithAccess,
+            'total_count' => count($trendingWithAccess),
             'updated_at' => now()->toISOString(),
+            'access_level' => [
+                'is_premium' => $user->isPremium(),
+                'sentiment_access' => $user->isPremium(),
+                'features_available' => $user->isPremium() 
+                    ? ['full_sentiment', 'trending_scores', 'confidence_scores', 'trend_direction']
+                    : ['basic_prices', 'trending_tiers'],
+                'upgrade_benefits' => [
+                    'AI sentiment analysis',
+                    'Detailed trending scores',
+                    'Confidence indicators',
+                    'Trend predictions',
+                    'Historical sentiment data'
+                ]
+            ]
         ]);
     }
 
     /**
-     * Get sentiment history for a cryptocurrency - NAPRAWIONE
+     * Get sentiment history - Premium only
      */
     public function history(Request $request, string $coinGeckoId)
     {
+        $user = Auth::user();
+        
+        // DODANE: Sprawdzenie Premium access
+        if (!$user->isPremium()) {
+            return response()->json([
+                'error' => 'Premium feature required',
+                'message' => 'Sentiment history jest dostępne tylko dla użytkowników Premium.',
+                'upgrade_required' => true,
+                'feature' => 'Sentiment History',
+                'premium_benefits' => [
+                    'Pełna historia sentiment',
+                    'Godzinowe analizy',
+                    'Wykresy trendów',
+                    'Prognozy AI',
+                    'Porównania z rynkiem'
+                ]
+            ], 403);
+        }
+
         $days = min($request->get('days', 7), 30);
         
         Log::info('Discovery history request', [
             'coingecko_id' => $coinGeckoId,
-            'days' => $days
+            'days' => $days,
+            'user_premium' => true
         ]);
         
         // Find cryptocurrency by coingecko_id
@@ -57,7 +125,7 @@ class DiscoveryController extends Controller
             return response()->json(['error' => 'Cryptocurrency not found'], 404);
         }
 
-        // Get trend analyses for this crypto in the specified period - now with better hourly support
+        // Get trend analyses for this crypto in the specified period
         $analyses = TrendAnalysis::where('cryptocurrency_id', $crypto->id)
             ->where('created_at', '>=', now()->subDays($days))
             ->orderBy('created_at', 'asc')
@@ -74,7 +142,6 @@ class DiscoveryController extends Controller
         $dailyAnalyses = $analyses->groupBy(function ($analysis) {
             return $analysis->created_at->format('Y-m-d');
         })->map(function ($dayAnalyses, $date) {
-            // Get the most recent analysis of the day for trend direction
             $latestAnalysis = $dayAnalyses->last();
             
             return [
@@ -85,21 +152,14 @@ class DiscoveryController extends Controller
                 'confidence_score' => round($dayAnalyses->avg('confidence_score')),
                 'sentiment_change' => $latestAnalysis->sentiment_change ?? 0,
                 'hourly_breakdown' => $latestAnalysis->hourly_breakdown ?? [],
-                'analyses_count' => $dayAnalyses->count(), // How many analyses this day
+                'analyses_count' => $dayAnalyses->count(),
                 'first_analysis' => $dayAnalyses->first()->created_at->format('H:i'),
                 'last_analysis' => $latestAnalysis->created_at->format('H:i'),
             ];
         })->values();
 
-        Log::info('Found trend analyses', [
-            'crypto' => $crypto->name,
-            'analyses_count' => $analyses->count(),
-            'period_days' => $days
-        ]);
-
-        // If no analyses found, try to get at least current data from cryptocurrency table
+        // If no analyses found, try to get current data
         if ($dailyAnalyses->isEmpty()) {
-            // Create mock data point from current cryptocurrency data
             $mockHistoryData = [];
             
             if ($crypto->sentiment_updated_at) {
@@ -137,10 +197,7 @@ class DiscoveryController extends Controller
             ]);
         }
 
-        // Transform daily analyses data for the response
         $historyData = $dailyAnalyses;
-
-        // Calculate summary stats from daily aggregated data
         $totalMentions = $dailyAnalyses->sum('mention_count');
         $avgSentiment = $dailyAnalyses->avg('sentiment_avg');
         $sentimentTrend = $dailyAnalyses->count() > 1 
@@ -171,11 +228,12 @@ class DiscoveryController extends Controller
     }
 
     /**
-     * Search cryptocurrencies for adding to watchlist
+     * Search cryptocurrencies with basic info for all, sentiment for Premium
      */
     public function search(Request $request)
     {
         $query = $request->get('q', '');
+        $user = Auth::user();
         
         if (strlen($query) < 2) {
             return response()->json([]);
@@ -184,44 +242,80 @@ class DiscoveryController extends Controller
         $cryptos = Cryptocurrency::where('name', 'like', "%{$query}%")
             ->orWhere('symbol', 'like', "%{$query}%")
             ->limit(20)
-            ->get(['id', 'name', 'symbol', 'image', 'current_price_pln', 'daily_mentions', 'current_sentiment']);
+            ->get(['id', 'name', 'symbol', 'image', 'current_price_pln', 'daily_mentions', 'current_sentiment', 'trending_score']);
 
         // Add watchlist status
-        $user = Auth::user();
         $watchlistIds = $user->watchlist()->pluck('cryptocurrency_id')->toArray();
 
-        $results = $cryptos->map(function ($crypto) use ($watchlistIds) {
-            return [
+        $results = $cryptos->map(function ($crypto) use ($watchlistIds, $user) {
+            $baseData = [
                 'id' => $crypto->id,
                 'name' => $crypto->name,
                 'symbol' => $crypto->symbol,
                 'image' => $crypto->image,
                 'current_price_pln' => $crypto->current_price_pln,
-                'daily_mentions' => $crypto->daily_mentions ?? 0,
-                'current_sentiment' => $crypto->current_sentiment ?? 0,
                 'is_watchlisted' => in_array($crypto->id, $watchlistIds),
             ];
+
+            // ZMIENIONE: Sentiment data tylko dla Premium
+            if ($user->isPremium()) {
+                $baseData['daily_mentions'] = $crypto->daily_mentions ?? 0;
+                $baseData['current_sentiment'] = $crypto->current_sentiment ?? 0;
+                $baseData['trending_score'] = $crypto->trending_score ?? 0;
+                $baseData['has_sentiment_data'] = ($crypto->daily_mentions ?? 0) > 0;
+            } else {
+                // DODANE: Ograniczone dane dla darmowych
+                $baseData['daily_mentions'] = null;
+                $baseData['current_sentiment'] = null;
+                $baseData['trending_score'] = null;
+                $baseData['has_sentiment_data'] = ($crypto->daily_mentions ?? 0) > 0;
+                $baseData['premium_required'] = true;
+            }
+
+            return $baseData;
         });
 
         return response()->json($results);
     }
 
     /**
-     * Get discovery stats and overview - IMPROVED to use cryptocurrency fields
+     * Get discovery stats - Premium only
      */
     public function stats()
     {
-        // Get stats from cryptocurrency table (now properly updated)
+        $user = Auth::user();
+        
+        // DODANE: Sprawdzenie Premium access
+        if (!$user->isPremium()) {
+            return response()->json([
+                'error' => 'Premium feature required',
+                'message' => 'Discovery stats są dostępne tylko dla użytkowników Premium.',
+                'upgrade_required' => true,
+                'feature' => 'Discovery Statistics',
+                'preview_data' => [
+                    'total_cryptos_tracked' => Cryptocurrency::whereNotNull('current_price_pln')->count(),
+                    'premium_features' => [
+                        'Detailed sentiment statistics',
+                        'Top performers analysis',
+                        'Market sentiment overview',
+                        'Trending distribution',
+                        'Source activity breakdown'
+                    ]
+                ]
+            ], 403);
+        }
+
+        // Get stats from cryptocurrency table
         $recentlyUpdated = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())->get();
         
         $totalCryptosAnalyzed = $recentlyUpdated->count();
         $totalMentionsToday = $recentlyUpdated->sum('daily_mentions');
         $avgSentimentToday = $recentlyUpdated->avg('current_sentiment');
 
-        // Get top performers using the updated fields
+        // Get top performers
         $topPositive = Cryptocurrency::where('sentiment_updated_at', '>=', now()->subDay())
             ->where('current_sentiment', '>', 0)
-            ->where('daily_mentions', '>', 0) // Must have mentions to be relevant
+            ->where('daily_mentions', '>', 0)
             ->orderBy('current_sentiment', 'desc')
             ->limit(3)
             ->get(['name', 'symbol', 'image', 'current_sentiment', 'daily_mentions']);
@@ -261,5 +355,16 @@ class DiscoveryController extends Controller
                 'most_mentioned' => $mostMentioned,
             ],
         ]);
+    }
+
+    /**
+     * DODANE: Helper method to determine trending tier for free users
+     */
+    private function getTrendingTier(int $score): string
+    {
+        if ($score >= 80) return 'hot';
+        if ($score >= 50) return 'trending';
+        if ($score >= 20) return 'moderate';
+        return 'low';
     }
 }

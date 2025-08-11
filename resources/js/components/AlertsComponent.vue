@@ -1,11 +1,41 @@
 <template>
   <div class="alerts-component">
+    <!-- DODANE: Premium upgrade banner dla darmowych użytkowników -->
+    <div v-if="!isPremium && alertsLimits.current_active_count >= 4" class="limit-warning-banner">
+      <div class="banner-content">
+        <div class="banner-icon">🔔</div>
+        <div class="banner-text">
+          <h4>Zbliżasz się do limitu alertów!</h4>
+          <p>{{ alertsLimits.current_active_count }}/{{ alertsLimits.alerts_limit }} aktywnych alertów</p>
+        </div>
+        <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+          Upgrade do Premium
+        </button>
+      </div>
+    </div>
+
     <!-- Add Alert Modal -->
     <div v-if="showAddModal" class="modal-overlay" @click="closeAddModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>{{ editingAlert ? 'Edit Alert' : 'Create Price Alert' }}</h3>
           <button @click="closeAddModal" class="close-btn">&times;</button>
+        </div>
+        
+        <!-- DODANE: Limit warning w modal -->
+        <div v-if="!isPremium && !editingAlert" class="modal-limit-info">
+          <div class="limit-progress">
+            <span class="limit-text">Aktywne alerty: {{ alertsLimits.current_active_count }}/{{ alertsLimits.alerts_limit }}</span>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ width: (alertsLimits.current_active_count / alertsLimits.alerts_limit * 100) + '%' }"
+              ></div>
+            </div>
+          </div>
+          <div v-if="!isPremium" class="premium-features-hint">
+            <p><strong>Premium:</strong> Nieograniczone alerty + sentiment alerts</p>
+          </div>
         </div>
         
         <form @submit.prevent="saveAlert" class="add-alert-form">
@@ -74,7 +104,7 @@
             <button type="button" @click="closeAddModal" class="btn btn-secondary">
               Cancel
             </button>
-            <button type="submit" :disabled="!selectedCrypto || loading" class="btn btn-primary">
+            <button type="submit" :disabled="!selectedCrypto || loading || !canAddMore" class="btn btn-primary">
               <span v-if="loading">{{ editingAlert ? 'Updating...' : 'Creating...' }}</span>
               <span v-else>{{ editingAlert ? 'Update Alert' : 'Create Alert' }}</span>
             </button>
@@ -83,14 +113,60 @@
       </div>
     </div>
 
+    <!-- DODANE: Upgrade Modal -->
+    <div v-if="showUpgradeModal" class="modal-overlay" @click="closeUpgradeModal">
+      <div class="modal-content upgrade-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🚀 Upgrade do Premium - Alerty</h3>
+          <button @click="closeUpgradeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="upgrade-content">
+          <div class="upgrade-benefits">
+            <h4>Premium Alerts Features:</h4>
+            <ul>
+              <li>✅ Nieograniczone alerty cenowe</li>
+              <li>✅ Alerty sentiment (AI analysis)</li>
+              <li>✅ Push notifications</li>
+              <li>✅ Zaawansowane warunki alertów</li>
+              <li>✅ Priorytetowe powiadomienia</li>
+              <li>✅ Alerty kombinowane (cena + sentiment)</li>
+            </ul>
+          </div>
+          <div class="upgrade-pricing">
+            <div class="price">19 PLN/miesiąc</div>
+            <button class="btn btn-premium btn-large">
+              Aktywuj Premium
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Alerts List -->
     <div class="alerts-container">
       <div class="alerts-header">
         <h3>Price Alerts</h3>
-        <button @click="showAddModal = true" class="btn btn-primary">
-          <span class="btn-icon">🔔</span>
-          Add Alert
-        </button>
+        <div class="header-actions">
+          <button 
+            @click="showAddModal = true" 
+            :disabled="!canAddMore"
+            class="btn btn-primary"
+            :class="{ 'btn-disabled': !canAddMore }"
+          >
+            <span class="btn-icon">🔔</span>
+            Add Alert
+            <span v-if="!isPremium" class="btn-limit">({{ alertsLimits.current_active_count }}/{{ alertsLimits.alerts_limit }})</span>
+          </button>
+          
+          <!-- DODANE: Upgrade button dla darmowych użytkowników -->
+          <button 
+            v-if="!isPremium"
+            @click="showUpgradeModal = true"
+            class="btn btn-premium btn-small"
+          >
+            🚀 Unlock Unlimited
+          </button>
+        </div>
       </div>
 
       <div v-if="loading && alerts.length === 0" class="loading-state">
@@ -102,9 +178,17 @@
         <div class="empty-icon">🔔</div>
         <h3>No price alerts</h3>
         <p>Create your first price alert to get notified when prices change</p>
-        <button @click="showAddModal = true" class="btn btn-primary">
-          Create Your First Alert
-        </button>
+        <div class="empty-actions">
+          <button @click="showAddModal = true" class="btn btn-primary">
+            Create Your First Alert
+          </button>
+          <div v-if="!isPremium" class="limit-info">
+            <p>Darmowy plan: do {{ alertsLimits.alerts_limit }} aktywnych alertów</p>
+            <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+              Unlock Unlimited + AI Alerts
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="alerts-list">
@@ -112,7 +196,11 @@
           v-for="alert in alerts" 
           :key="alert.id"
           class="alert-card"
-          :class="{ 'alert-inactive': !alert.is_active, 'alert-triggered': alert.triggered_at }"
+          :class="{ 
+            'alert-inactive': !alert.is_active, 
+            'alert-triggered': alert.triggered_at,
+            'alert-premium': isPremium 
+          }"
         >
           <div class="alert-main">
             <div class="crypto-info">
@@ -160,6 +248,7 @@
               @click="toggleAlert(alert)" 
               class="btn btn-small"
               :class="alert.is_active ? 'btn-warning' : 'btn-success'"
+              :disabled="!alert.is_active && !canActivateAlert"
             >
               {{ alert.is_active ? 'Disable' : 'Enable' }}
             </button>
@@ -176,6 +265,34 @@
           </div>
         </div>
       </div>
+
+      <!-- DODANE: Premium features showcase -->
+      <div v-if="!isPremium && alerts.length > 0" class="premium-showcase">
+        <div class="showcase-content">
+          <h4>🤖 Chcesz więcej? Premium oferuje:</h4>
+          <div class="feature-grid">
+            <div class="feature-item">
+              <span class="feature-icon">🧠</span>
+              <span class="feature-text">Sentiment Alerts</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📱</span>
+              <span class="feature-text">Push Notifications</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">∞</span>
+              <span class="feature-text">Unlimited Alerts</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">⚡</span>
+              <span class="feature-text">Priority Delivery</span>
+            </div>
+          </div>
+          <button @click="showUpgradeModal = true" class="btn btn-premium">
+            Upgrade za 19 PLN/miesiąc
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -188,6 +305,7 @@ export default {
       alerts: [],
       loading: false,
       showAddModal: false,
+      showUpgradeModal: false, // DODANE
       editingAlert: null,
       selectedCrypto: null,
       searchQuery: '',
@@ -197,7 +315,32 @@ export default {
         type: 'above',
         target_price: '',
         currency: 'PLN'
+      },
+      // DODANE: limity alertów
+      alertsLimits: {
+        is_premium: false,
+        alerts_limit: 5,
+        current_active_count: 0,
+        can_add_more: true,
+        total_count: 0
+      },
+      premiumFeatures: {
+        unlimited_alerts: false,
+        sentiment_alerts: false,
+        push_notifications: false,
+        advanced_conditions: false
       }
+    }
+  },
+  computed: {
+    isPremium() {
+      return this.alertsLimits.is_premium;
+    },
+    canAddMore() {
+      return this.alertsLimits.can_add_more;
+    },
+    canActivateAlert() {
+      return this.isPremium || this.alertsLimits.current_active_count < this.alertsLimits.alerts_limit;
     }
   },
   async mounted() {
@@ -208,8 +351,20 @@ export default {
       this.loading = true;
       try {
         const response = await window.axios.get('/api/alerts');
-        this.alerts = response.data;
-        this.$emit('alerts-updated', this.alerts.filter(a => a.is_active && !a.triggered_at).length);
+        this.alerts = response.data.alerts;
+        
+        // DODANE: wczytanie limitów
+        this.alertsLimits = response.data.limits || {
+          is_premium: false,
+          alerts_limit: 5,
+          current_active_count: 0,
+          can_add_more: true,
+          total_count: 0
+        };
+        
+        this.premiumFeatures = response.data.premium_features || {};
+        
+        this.$emit('alerts-updated', this.alertsLimits.current_active_count);
       } catch (error) {
         console.error('Error loading alerts:', error);
         this.showError('Failed to load alerts');
@@ -218,6 +373,110 @@ export default {
       }
     },
 
+    async saveAlert() {
+      if (!this.selectedCrypto && !this.editingAlert) return;
+
+      this.loading = true;
+      try {
+        const data = {
+          cryptocurrency_id: this.editingAlert ? this.editingAlert.cryptocurrency_id : this.selectedCrypto.id,
+          type: this.alertForm.type,
+          target_price: parseFloat(this.alertForm.target_price),
+          currency: this.alertForm.currency
+        };
+
+        if (this.editingAlert) {
+          await window.axios.put(`/api/alerts/${this.editingAlert.id}`, data);
+          this.showSuccess('Alert updated successfully');
+        } else {
+          const response = await window.axios.post('/api/alerts', data);
+          
+          // DODANE: aktualizacja limitów po dodaniu
+          if (response.data.limits_info) {
+            this.alertsLimits = {
+              ...this.alertsLimits,
+              ...response.data.limits_info
+            };
+          }
+          
+          this.showSuccess('Alert created successfully');
+        }
+
+        await this.loadAlerts();
+        this.closeAddModal();
+      } catch (error) {
+        console.error('Error saving alert:', error);
+        
+        // DODANE: obsługa błędów limitów
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.closeAddModal();
+          this.showError(error.response.data.message);
+        } else {
+          this.showError('Failed to save alert');
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async toggleAlert(alert) {
+      try {
+        const response = await window.axios.post(`/api/alerts/${alert.id}/toggle`);
+        
+        // DODANE: aktualizacja limitów po toggle
+        if (response.data.limits_info) {
+          this.alertsLimits = {
+            ...this.alertsLimits,
+            ...response.data.limits_info
+          };
+        }
+        
+        this.showSuccess(`Alert ${alert.is_active ? 'disabled' : 'enabled'}`);
+        await this.loadAlerts();
+      } catch (error) {
+        console.error('Error toggling alert:', error);
+        
+        // DODANE: obsługa błędów limitów przy włączaniu
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.showError(error.response.data.message);
+        } else {
+          this.showError('Failed to toggle alert');
+        }
+      }
+    },
+
+    async deleteAlert(alert) {
+      if (!confirm(`Are you sure you want to delete this alert for ${alert.cryptocurrency.name}?`)) {
+        return;
+      }
+
+      try {
+        const response = await window.axios.delete(`/api/alerts/${alert.id}`);
+        
+        // DODANE: aktualizacja limitów po usunięciu
+        if (response.data.limits_info) {
+          this.alertsLimits = {
+            ...this.alertsLimits,
+            ...response.data.limits_info
+          };
+        }
+        
+        this.showSuccess('Alert deleted successfully');
+        await this.loadAlerts();
+      } catch (error) {
+        console.error('Error deleting alert:', error);
+        this.showError('Failed to delete alert');
+      }
+    },
+
+    // DODANE: nowe metody
+    closeUpgradeModal() {
+      this.showUpgradeModal = false;
+    },
+
+    // Reszta metod bez większych zmian...
     async searchCryptocurrencies() {
       if (this.searchQuery.length < 2) {
         this.searchResults = [];
@@ -244,47 +503,6 @@ export default {
       this.searchResults = [];
     },
 
-    async saveAlert() {
-      if (!this.selectedCrypto && !this.editingAlert) return;
-
-      this.loading = true;
-      try {
-        const data = {
-          cryptocurrency_id: this.editingAlert ? this.editingAlert.cryptocurrency_id : this.selectedCrypto.id,
-          type: this.alertForm.type,
-          target_price: parseFloat(this.alertForm.target_price),
-          currency: this.alertForm.currency
-        };
-
-        if (this.editingAlert) {
-          await window.axios.put(`/api/alerts/${this.editingAlert.id}`, data);
-          this.showSuccess('Alert updated successfully');
-        } else {
-          await window.axios.post('/api/alerts', data);
-          this.showSuccess('Alert created successfully');
-        }
-
-        await this.loadAlerts();
-        this.closeAddModal();
-      } catch (error) {
-        console.error('Error saving alert:', error);
-        this.showError('Failed to save alert');
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async toggleAlert(alert) {
-      try {
-        await window.axios.post(`/api/alerts/${alert.id}/toggle`);
-        this.showSuccess(`Alert ${alert.is_active ? 'disabled' : 'enabled'}`);
-        await this.loadAlerts();
-      } catch (error) {
-        console.error('Error toggling alert:', error);
-        this.showError('Failed to toggle alert');
-      }
-    },
-
     editAlert(alert) {
       this.editingAlert = alert;
       this.selectedCrypto = alert.cryptocurrency;
@@ -295,21 +513,6 @@ export default {
         currency: alert.currency
       };
       this.showAddModal = true;
-    },
-
-    async deleteAlert(alert) {
-      if (!confirm(`Are you sure you want to delete this alert for ${alert.cryptocurrency.name}?`)) {
-        return;
-      }
-
-      try {
-        await window.axios.delete(`/api/alerts/${alert.id}`);
-        this.showSuccess('Alert deleted successfully');
-        await this.loadAlerts();
-      } catch (error) {
-        console.error('Error deleting alert:', error);
-        this.showError('Failed to delete alert');
-      }
     },
 
     closeAddModal() {

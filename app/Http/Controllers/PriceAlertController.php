@@ -12,16 +12,60 @@ class PriceAlertController extends Controller
 {
     public function index()
     {
-        $alerts = Auth::user()->priceAlerts()
+        $user = Auth::user();
+        
+        $alerts = $user->priceAlerts()
             ->with('cryptocurrency')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json($alerts);
+        $activeAlertsCount = $alerts->where('is_active', true)->where('triggered_at', null)->count();
+
+        return response()->json([
+            'alerts' => $alerts,
+            // DODANE: informacje o limitach
+            'limits' => [
+                'is_premium' => $user->isPremium(),
+                'alerts_limit' => $user->isPremium() ? null : 5,
+                'current_active_count' => $activeAlertsCount,
+                'can_add_more' => $user->isPremium() || $activeAlertsCount < 5,
+                'total_count' => $alerts->count(),
+                'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla nieograniczonych alertów + sentiment alerts'
+            ],
+            // DODANE: premium features info
+            'premium_features' => [
+                'unlimited_alerts' => $user->isPremium(),
+                'sentiment_alerts' => $user->isPremium(),
+                'push_notifications' => $user->isPremium(),
+                'advanced_conditions' => $user->isPremium()
+            ]
+        ]);
     }
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
+        // DODANE: Sprawdzenie limitów przed walidacją
+        $activeAlertsCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
+        
+        if (!$user->isPremium() && $activeAlertsCount >= 5) {
+            return response()->json([
+                'error' => 'Alerts limit reached',
+                'message' => 'Darmowy plan pozwala na maksymalnie 5 aktywnych alertów.',
+                'upgrade_required' => true,
+                'current_limit' => 5,
+                'current_count' => $activeAlertsCount,
+                'premium_benefits' => [
+                    'Nieograniczone alerty cenowe',
+                    'Alerty sentiment (AI)',
+                    'Push notifications',
+                    'Zaawansowane warunki alertów',
+                    'Priorytetowe powiadomienia'
+                ]
+            ], 403);
+        }
+
         $request->validate([
             'cryptocurrency_id' => ['required', 'exists:cryptocurrencies,id'],
             'type' => ['required', 'in:above,below'],
@@ -29,7 +73,7 @@ class PriceAlertController extends Controller
             'currency' => ['required', 'in:PLN,USD'],
         ]);
 
-        $alert = Auth::user()->priceAlerts()->create([
+        $alert = $user->priceAlerts()->create([
             'cryptocurrency_id' => $request->cryptocurrency_id,
             'type' => $request->type,
             'target_price' => $request->target_price,
@@ -37,9 +81,18 @@ class PriceAlertController extends Controller
             'is_active' => true,
         ]);
 
+        $newActiveCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
+
         return response()->json([
             'message' => 'Alert utworzony pomyślnie',
-            'alert' => $alert->load('cryptocurrency')
+            'alert' => $alert->load('cryptocurrency'),
+            // DODANE: aktualne info o limitach
+            'limits_info' => [
+                'current_active_count' => $newActiveCount,
+                'limit' => $user->isPremium() ? null : 5,
+                'can_add_more' => $user->isPremium() || $newActiveCount < 5,
+                'is_premium' => $user->isPremium()
+            ]
         ], 201);
     }
 
@@ -74,7 +127,18 @@ class PriceAlertController extends Controller
 
         $alert->delete();
 
-        return response()->json(['message' => 'Alert usunięty pomyślnie']);
+        $user = Auth::user();
+        $newActiveCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
+
+        return response()->json([
+            'message' => 'Alert usunięty pomyślnie',
+            // DODANE: aktualne info o limitach po usunięciu
+            'limits_info' => [
+                'current_active_count' => $newActiveCount,
+                'limit' => $user->isPremium() ? null : 5,
+                'can_add_more' => $user->isPremium() || $newActiveCount < 5
+            ]
+        ]);
     }
 
     public function toggle(PriceAlert $alert)
@@ -84,11 +148,36 @@ class PriceAlertController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        $user = Auth::user();
+        
+        // DODANE: Sprawdzenie limitów gdy włączamy alert
+        if (!$alert->is_active && !$user->isPremium()) {
+            $activeAlertsCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
+            
+            if ($activeAlertsCount >= 5) {
+                return response()->json([
+                    'error' => 'Cannot activate alert - limit reached',
+                    'message' => 'Nie możesz włączyć alertu - osiągnięty limit 5 aktywnych alertów.',
+                    'upgrade_required' => true,
+                    'current_limit' => 5,
+                    'current_count' => $activeAlertsCount
+                ], 403);
+            }
+        }
+
         $alert->update(['is_active' => !$alert->is_active]);
+
+        $newActiveCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
 
         return response()->json([
             'message' => $alert->is_active ? 'Alert włączony' : 'Alert wyłączony',
-            'alert' => $alert->load('cryptocurrency')
+            'alert' => $alert->load('cryptocurrency'),
+            // DODANE: aktualne info o limitach
+            'limits_info' => [
+                'current_active_count' => $newActiveCount,
+                'limit' => $user->isPremium() ? null : 5,
+                'can_add_more' => $user->isPremium() || $newActiveCount < 5
+            ]
         ]);
     }
 }

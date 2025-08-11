@@ -2,12 +2,39 @@
 
 <template>
   <div class="portfolio-component">
+    <!-- DODANE: Premium upgrade banner dla darmowych użytkowników -->
+    <div v-if="!isPremium && portfolioLimits.current_count >= 8" class="limit-warning-banner">
+      <div class="banner-content">
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-text">
+          <h4>Zbliżasz się do limitu portfolio!</h4>
+          <p>{{ portfolioLimits.current_count }}/{{ portfolioLimits.portfolio_limit }} pozycji wykorzystanych</p>
+        </div>
+        <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+          Upgrade do Premium
+        </button>
+      </div>
+    </div>
+
     <!-- Add Holding Modal -->
     <div v-if="showAddModal" class="modal-overlay" @click="closeAddModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>{{ editingHolding ? 'Edit Holding' : 'Add New Holding' }}</h3>
           <button @click="closeAddModal" class="close-btn">&times;</button>
+        </div>
+        
+        <!-- DODANE: Limit warning w modal -->
+        <div v-if="!isPremium && !editingHolding" class="modal-limit-info">
+          <div class="limit-progress">
+            <span class="limit-text">Portfolio: {{ portfolioLimits.current_count }}/{{ portfolioLimits.portfolio_limit }}</span>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ width: (portfolioLimits.current_count / portfolioLimits.portfolio_limit * 100) + '%' }"
+              ></div>
+            </div>
+          </div>
         </div>
         
         <form @submit.prevent="saveHolding" class="add-holding-form">
@@ -73,14 +100,59 @@
       </div>
     </div>
 
+    <!-- DODANE: Upgrade Modal -->
+    <div v-if="showUpgradeModal" class="modal-overlay" @click="closeUpgradeModal">
+      <div class="modal-content upgrade-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🚀 Upgrade do Premium</h3>
+          <button @click="closeUpgradeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="upgrade-content">
+          <div class="upgrade-benefits">
+            <h4>Portfolio Premium Features:</h4>
+            <ul>
+              <li>✅ Nieograniczona liczba kryptowalut</li>
+              <li>✅ Zaawansowane wykresy i analytics</li>
+              <li>✅ Historia transakcji</li>
+              <li>✅ Export danych do CSV/PDF</li>
+              <li>✅ Alerty sentiment dla portfolio</li>
+            </ul>
+          </div>
+          <div class="upgrade-pricing">
+            <div class="price">19 PLN/miesiąc</div>
+            <button class="btn btn-premium btn-large">
+              Aktywuj Premium
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Holdings List -->
     <div class="holdings-container">
       <div class="holdings-header">
         <h3>Your Holdings</h3>
-        <button @click="showAddModal = true" class="btn btn-primary">
-          <span class="btn-icon">+</span>
-          Add Holding
-        </button>
+        <div class="header-actions">
+          <button 
+            @click="showAddModal = true" 
+            :disabled="!canAddMore"
+            class="btn btn-primary"
+            :class="{ 'btn-disabled': !canAddMore }"
+          >
+            <span class="btn-icon">+</span>
+            Add Holding
+            <span v-if="!isPremium" class="btn-limit">({{ portfolioLimits.current_count }}/{{ portfolioLimits.portfolio_limit }})</span>
+          </button>
+          
+          <!-- DODANE: Upgrade button dla darmowych użytkowników -->
+          <button 
+            v-if="!isPremium"
+            @click="showUpgradeModal = true"
+            class="btn btn-premium btn-small"
+          >
+            🚀 Upgrade
+          </button>
+        </div>
       </div>
 
       <div v-if="loading && holdings.length === 0" class="loading-state">
@@ -92,9 +164,17 @@
         <div class="empty-icon">📊</div>
         <h3>No holdings yet</h3>
         <p>Add your first cryptocurrency to start tracking your portfolio</p>
-        <button @click="showAddModal = true" class="btn btn-primary">
-          Add Your First Holding
-        </button>
+        <div class="empty-actions">
+          <button @click="showAddModal = true" class="btn btn-primary">
+            Add Your First Holding
+          </button>
+          <div v-if="!isPremium" class="limit-info">
+            <p>Darmowy plan: do {{ portfolioLimits.portfolio_limit }} kryptowalut</p>
+            <button @click="showUpgradeModal = true" class="btn btn-premium btn-small">
+              Unlock Unlimited Portfolio
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="holdings-list">
@@ -169,6 +249,7 @@ export default {
       holdings: [],
       loading: false,
       showAddModal: false,
+      showUpgradeModal: false, // DODANE
       editingHolding: null,
       selectedCrypto: null,
       searchQuery: '',
@@ -177,7 +258,22 @@ export default {
       holdingForm: {
         amount: '',
         average_buy_price: ''
+      },
+      // DODANE: limity
+      portfolioLimits: {
+        is_premium: false,
+        portfolio_limit: 10,
+        current_count: 0,
+        can_add_more: true
       }
+    }
+  },
+  computed: {
+    isPremium() {
+      return this.portfolioLimits.is_premium;
+    },
+    canAddMore() {
+      return this.portfolioLimits.can_add_more;
     }
   },
   async mounted() {
@@ -189,6 +285,15 @@ export default {
       try {
         const response = await window.axios.get('/api/portfolio');
         this.holdings = response.data.holdings;
+        
+        // DODANE: wczytanie limitów
+        this.portfolioLimits = response.data.limits || {
+          is_premium: false,
+          portfolio_limit: 10,
+          current_count: 0,
+          can_add_more: true
+        };
+        
         this.$emit('portfolio-updated', response.data.portfolio_stats);
       } catch (error) {
         console.error('Error loading holdings:', error);
@@ -198,6 +303,58 @@ export default {
       }
     },
 
+    async saveHolding() {
+      if (!this.selectedCrypto && !this.editingHolding) return;
+
+      this.loading = true;
+      try {
+        const data = {
+          cryptocurrency_id: this.editingHolding ? this.editingHolding.cryptocurrency_id : this.selectedCrypto.id,
+          amount: parseFloat(this.holdingForm.amount),
+          average_buy_price: this.holdingForm.average_buy_price ? parseFloat(this.holdingForm.average_buy_price) : null
+        };
+
+        if (this.editingHolding) {
+          await window.axios.put(`/api/portfolio/${this.editingHolding.id}`, data);
+          this.showSuccess('Holding updated successfully');
+        } else {
+          const response = await window.axios.post('/api/portfolio', data);
+          
+          // DODANE: aktualizacja limitów po dodaniu
+          if (response.data.limits_info) {
+            this.portfolioLimits = {
+              ...this.portfolioLimits,
+              ...response.data.limits_info
+            };
+          }
+          
+          this.showSuccess('Holding added successfully');
+        }
+
+        await this.loadHoldings();
+        this.closeAddModal();
+      } catch (error) {
+        console.error('Error saving holding:', error);
+        
+        // DODANE: obsługa błędów limitów
+        if (error.response && error.response.status === 403 && error.response.data.upgrade_required) {
+          this.showUpgradeModal = true;
+          this.closeAddModal();
+          this.showError(error.response.data.message);
+        } else {
+          this.showError('Failed to save holding');
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // DODANE: nowe metody
+    closeUpgradeModal() {
+      this.showUpgradeModal = false;
+    },
+
+    // Reszta metod bez zmian...
     async searchCryptocurrencies() {
       if (this.searchQuery.length < 2) {
         this.searchResults = [];
@@ -224,35 +381,6 @@ export default {
       this.searchResults = [];
     },
 
-    async saveHolding() {
-      if (!this.selectedCrypto && !this.editingHolding) return;
-
-      this.loading = true;
-      try {
-        const data = {
-          cryptocurrency_id: this.editingHolding ? this.editingHolding.cryptocurrency_id : this.selectedCrypto.id,
-          amount: parseFloat(this.holdingForm.amount),
-          average_buy_price: this.holdingForm.average_buy_price ? parseFloat(this.holdingForm.average_buy_price) : null
-        };
-
-        if (this.editingHolding) {
-          await window.axios.put(`/api/portfolio/${this.editingHolding.id}`, data);
-          this.showSuccess('Holding updated successfully');
-        } else {
-          await window.axios.post('/api/portfolio', data);
-          this.showSuccess('Holding added successfully');
-        }
-
-        await this.loadHoldings();
-        this.closeAddModal();
-      } catch (error) {
-        console.error('Error saving holding:', error);
-        this.showError('Failed to save holding');
-      } finally {
-        this.loading = false;
-      }
-    },
-
     editHolding(holding) {
       this.editingHolding = holding;
       this.selectedCrypto = holding.cryptocurrency;
@@ -268,7 +396,16 @@ export default {
       }
 
       try {
-        await window.axios.delete(`/api/portfolio/${holding.id}`);
+        const response = await window.axios.delete(`/api/portfolio/${holding.id}`);
+        
+        // DODANE: aktualizacja limitów po usunięciu
+        if (response.data.limits_info) {
+          this.portfolioLimits = {
+            ...this.portfolioLimits,
+            ...response.data.limits_info
+          };
+        }
+        
         this.showSuccess('Holding deleted successfully');
         await this.loadHoldings();
       } catch (error) {
@@ -337,12 +474,10 @@ export default {
     },
 
     showSuccess(message) {
-      // You can implement toast notifications here
       console.log('Success:', message);
     },
 
     showError(message) {
-      // You can implement toast notifications here
       console.error('Error:', message);
     }
   }
@@ -350,6 +485,163 @@ export default {
 </script>
 
 <style scoped>
+/* Istniejące style + DODANE nowe */
+
+/* DODANE: Style dla limitów i upgrade */
+.limit-warning-banner {
+  background: linear-gradient(135deg, #fef3cd, #fde68a);
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.banner-icon {
+  font-size: 1.5rem;
+}
+
+.banner-text h4 {
+  margin: 0;
+  color: #92400e;
+  font-size: 1rem;
+}
+
+.banner-text p {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.9rem;
+}
+
+.modal-limit-info {
+  background: #f8fafc;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.limit-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.limit-text {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  transition: width 0.3s ease;
+}
+
+.upgrade-modal {
+  max-width: 500px;
+}
+
+.upgrade-content {
+  padding: 1rem 0;
+}
+
+.upgrade-benefits {
+  margin-bottom: 2rem;
+}
+
+.upgrade-benefits h4 {
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.upgrade-benefits ul {
+  list-style: none;
+  padding: 0;
+}
+
+.upgrade-benefits li {
+  padding: 0.5rem 0;
+  color: #64748b;
+}
+
+.upgrade-pricing {
+  text-align: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+}
+
+.price {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.btn-premium {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+}
+
+.btn-premium:hover {
+  background: linear-gradient(135deg, #7c3aed, #5b5cf1);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4);
+}
+
+.btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-limit {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.limit-info {
+  text-align: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.limit-info p {
+  margin: 0 0 0.5rem 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* Reszta istniejących styli pozostaje bez zmian */
 .portfolio-component {
   width: 100%;
 }
@@ -583,6 +875,11 @@ export default {
   font-size: 0.875rem;
 }
 
+.btn-large {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
 .btn-icon {
   font-size: 1.2rem;
   font-weight: bold;
@@ -765,6 +1062,16 @@ export default {
 
   .holding-actions {
     justify-content: stretch;
+  }
+
+  .banner-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }
 </style>
