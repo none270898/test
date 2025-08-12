@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PaymentController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -78,8 +79,22 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('verified')
         ->name('dashboard');
+     Route::get('/premium/upgrade', [PaymentController::class, 'showUpgrade'])->name('premium.upgrade');
+    
+    // Payment processing
+    Route::post('/payment/checkout', [PaymentController::class, 'createCheckoutSession'])->name('payment.checkout');
+    Route::get('/payment/success', [PaymentController::class, 'success'])->name('payment.success');
+    Route::get('/payment/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
+    Route::get('/payment/failed', [PaymentController::class, 'failed'])->name('payment.failed');
+    
+    // Billing management (Premium users only)
+    Route::middleware('premium')->group(function () {
+        Route::get('/payment/billing', [PaymentController::class, 'billingPortal'])->name('payment.billing');
+        Route::post('/payment/cancel-subscription', [PaymentController::class, 'cancelSubscription'])->name('payment.cancel-subscription');
+    });
 });
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+Route::post('/webhooks/stripe', [PaymentController::class, 'webhook'])->name('payment.webhook');

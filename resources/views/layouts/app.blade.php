@@ -40,6 +40,11 @@
                         <a href="{{ route('dashboard') }}" class="nav-link">Dashboard</a>
                         @if(auth()->user()->isPremium())
                             <span class="premium-badge">Premium</span>
+                            <a href="{{ route('payment.billing') }}" class="nav-link">Rozliczenia</a>
+                        @else
+                            <a href="{{ route('premium.upgrade') }}" class="nav-button premium-upgrade">
+                                🚀 Premium
+                            </a>
                         @endif
                         <form method="POST" action="{{ route('logout') }}" class="inline">
                             @csrf

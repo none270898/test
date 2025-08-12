@@ -22,11 +22,15 @@ class User extends Authenticatable implements MustVerifyEmail
         'premium_expires_at',
         'alerts_enabled',
         'email_notifications',
+        'stripe_customer_id',
+        'stripe_subscription_id',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'stripe_customer_id',
+        'stripe_subscription_id',
     ];
 
     protected function casts(): array
