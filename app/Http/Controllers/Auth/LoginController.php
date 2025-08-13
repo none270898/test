@@ -37,7 +37,7 @@ class LoginController extends Controller
     \Log::info('Auth success, redirecting to: ' . route('dashboard'));
     $request->session()->regenerate();
 
-    $redirect = redirect()->intended(route('dashboard'));
+    $redirect = redirect()->route('dashboard');
     \Log::info('Redirect created: ' . $redirect->getTargetUrl());
     
     return $redirect;
