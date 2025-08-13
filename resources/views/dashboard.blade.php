@@ -6,7 +6,7 @@
         <h1>Witaj, {{ auth()->user()->name }}!</h1>
         <div class="header-actions">
             @if(!auth()->user()->isPremium())
-                <a href="#" class="btn btn-premium">Upgrade do Premium</a>
+                <a href="{{route('premium.upgrade')}}" class="btn btn-premium">Upgrade do Premium</a>
             @endif
         </div>
     </div>

@@ -143,15 +143,6 @@
             Add Holding
             <span v-if="!isPremium" class="btn-limit">({{ portfolioLimits.current_count }}/{{ portfolioLimits.portfolio_limit }})</span>
           </button>
-          
-          <!-- DODANE: Upgrade button dla darmowych użytkowników -->
-          <button 
-            v-if="!isPremium"
-            @click="showUpgradeModal = true"
-            class="btn btn-premium btn-small"
-          >
-            🚀 Upgrade
-          </button>
         </div>
       </div>
 

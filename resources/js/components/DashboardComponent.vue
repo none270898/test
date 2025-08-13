@@ -125,9 +125,9 @@
               <li>✅ Advanced price alerts</li>
               <li>✅ Portfolio statistics & charts</li>
             </ul>
-            <button class="btn btn-premium">
+            <a href="/premium/upgrade" class="btn btn-premium">
               Upgrade to Premium - 19 PLN/month
-            </button>
+            </a>
           </div>
         </div>
       </div>

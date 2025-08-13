@@ -159,13 +159,6 @@
           </button>
           
           <!-- DODANE: Upgrade button dla darmowych użytkowników -->
-          <button 
-            v-if="!isPremium"
-            @click="showUpgradeModal = true"
-            class="btn btn-premium btn-small"
-          >
-            🚀 Unlock Unlimited
-          </button>
         </div>
       </div>
 
@@ -288,9 +281,6 @@
               <span class="feature-text">Priority Delivery</span>
             </div>
           </div>
-          <button @click="showUpgradeModal = true" class="btn btn-premium">
-            Upgrade za 19 PLN/miesiąc
-          </button>
         </div>
       </div>
     </div>
