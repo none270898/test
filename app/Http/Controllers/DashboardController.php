@@ -9,6 +9,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
+         \Log::info('Dashboard accessed for user: ' . auth()->id());
         return view('dashboard');
     }
 }
