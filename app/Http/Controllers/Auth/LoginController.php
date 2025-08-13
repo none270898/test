@@ -15,6 +15,7 @@ class LoginController extends Controller
 
     public function store(Request $request)
     {
+        Log::info('Login attempt', $request->all());
         $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
