@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('crypto:update-prices')->everyFiveMinutes();
 Schedule::command('crypto:sync-coins --pages=10')->daily();
 Schedule::command('alerts:check')->everyMinute();
+Schedule::command('alerts:check-sentiment')->everyThirtyMinutes(); // Check every 30min
 
 // AI Sentiment Analysis Pipeline - INCREASED FREQUENCY
 Schedule::command('sentiment:scrape')->everyThirtyMinutes(); // Every 30 minutes instead of hourly

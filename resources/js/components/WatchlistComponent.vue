@@ -230,16 +230,23 @@
           <!-- Card Footer -->
           <div class="card-footer">
             <span class="update-time">{{ isPremium && item.analysis_time ? item.analysis_time : 'Price updated live' }}</span>
-            <div class="notification-toggle">
-              <label class="toggle-switch">
-                <input
-                  type="checkbox"
-                  :checked="item.notifications_enabled"
-                  @change="toggleNotifications(item, $event)"
-                />
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="toggle-label">{{ isPremium ? 'Smart Alerts' : 'Price Alerts' }}</span>
+              <div class="notification-toggle">
+                <label class="toggle-switch">
+                  <input
+                    type="checkbox"
+                    :checked="item.notifications_enabled"
+                    @change="toggleNotifications(item, $event)"
+                    :disabled="!isPremium && item.smart_alerts_status === 'limit_reached'"
+                  />
+                  <span class="toggle-slider" :class="{ 'disabled': !isPremium && item.smart_alerts_status === 'limit_reached' }"></span>
+                </label>
+                <div class="toggle-info">
+                  <span class="toggle-label">Smart Alerts</span>
+                  <span v-if="!isPremium" class="alert-limit">
+                    {{ item.today_alerts_count || 0 }}/{{ item.daily_limit || 1 }} today
+                  </span>
+                  <span v-else class="alert-unlimited">Unlimited</span>
+                </div>
             </div>
           </div>
         </div>
@@ -408,7 +415,7 @@ export default {
       // DODANE: limity watchlist
       watchlistLimits: {
         is_premium: false,
-        watchlist_limit: 15,
+        watchlist_limit: 5,
         current_count: 0,
         can_add_more: true,
         sentiment_access: false
@@ -443,7 +450,7 @@ export default {
         // DODANE: wczytanie limitów
         this.watchlistLimits = response.data.limits || {
           is_premium: false,
-          watchlist_limit: 15,
+          watchlist_limit: 5,
           current_count: 0,
           can_add_more: true,
           sentiment_access: false

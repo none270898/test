@@ -16,6 +16,8 @@ return new class extends Migration
             
             $table->unique(['user_id', 'cryptocurrency_id']);
             $table->index(['user_id', 'notifications_enabled']);
+            $table->index(['notifications_enabled', 'created_at']);
+
         });
     }
 

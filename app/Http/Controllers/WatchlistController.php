@@ -17,87 +17,104 @@ class WatchlistController extends Controller
      * Get user's watchlist with premium-based sentiment access
      */
     public function index()
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        $watchlist = $user->watchlist()
-            ->with('cryptocurrency')
-            ->get();
+    $watchlist = $user->watchlist()
+        ->with('cryptocurrency')
+        ->get();
 
-        $watchlistSummary = $watchlist->map(function ($item) use ($user) {
-            $crypto = $item->cryptocurrency;
-            $latestAnalysis = $crypto->getLatestTrendAnalysis();
-
-            $data = [
-                'id' => $item->id,
-                'cryptocurrency' => [
-                    'id' => $crypto->id,
-                    'name' => $crypto->name,
-                    'symbol' => $crypto->symbol,
-                    'image' => $crypto->image,
-                    'coingecko_id' => $crypto->coingecko_id,
-                    'current_price_pln' => $crypto->current_price_pln ?? 0,
-                    'current_price_usd' => $crypto->current_price_usd ?? 0,
-                    'price_change_24h' => $crypto->price_change_24h ?? 0,
-                ],
-                'notifications_enabled' => $item->notifications_enabled,
-            ];
-
-            // ZMIENIONE: Sentiment data tylko dla Premium
-            if ($user->isPremium()) {
-                $data['sentiment_avg'] = $crypto->current_sentiment ?? 0;
-                $data['mention_count'] = $crypto->daily_mentions ?? 0;
-                $data['sentiment_change'] = $crypto->sentiment_change_24h ?? 0;
-                $data['trending_score'] = $crypto->trending_score ?? 0;
-                $data['trending_status'] = $crypto->getTrendingStatus();
-                $data['trend_direction'] = $latestAnalysis?->trend_direction ?? 'neutral';
-                $data['confidence_score'] = $latestAnalysis?->confidence_score ?? 0;
-                $data['emoji'] = $crypto->getSentimentEmoji();
-                $data['analysis_time'] = $crypto->sentiment_updated_at?->diffForHumans() ?? 'Never';
-                $data['has_recent_data'] = $crypto->hasRecentSentimentData(24);
-                $data['todays_analyses_count'] = $crypto->getTodayTrendAnalyses()->count();
-                $data['sentiment_access'] = true;
-            } else {
-                // DODANE: Ograniczone dane dla darmowych użytkowników
-                $data['sentiment_avg'] = null;
-                $data['mention_count'] = null;
-                $data['sentiment_change'] = null;
-                $data['trending_score'] = null;
-                $data['trending_status'] = null;
-                $data['trend_direction'] = null;
-                $data['confidence_score'] = null;
-                $data['emoji'] = '🔒';
-                $data['analysis_time'] = null;
-                $data['has_recent_data'] = false;
-                $data['todays_analyses_count'] = 0;
-                $data['sentiment_access'] = false;
-                $data['premium_required'] = true;
-            }
-
-            return $data;
-        });
-
-        return response()->json([
-            'watchlist' => $watchlistSummary,
-            'total_count' => $watchlistSummary->count(),
-            // DODANE: informacje o limitach i dostępie
-            'limits' => [
-                'is_premium' => $user->isPremium(),
-                'watchlist_limit' => $user->isPremium() ? null : 15,
-                'current_count' => $watchlistSummary->count(),
-                'can_add_more' => $user->isPremium() || $watchlistSummary->count() < 15,
-                'sentiment_access' => $user->isPremium(),
-                'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla nieograniczonej watchlist z AI sentiment tracking'
-            ],
-            'premium_features' => [
-                'unlimited_watchlist' => $user->isPremium(),
-                'sentiment_tracking' => $user->isPremium(),
-                'sentiment_notifications' => $user->isPremium(),
-                'trend_analysis' => $user->isPremium(),
-                'ai_insights' => $user->isPremium()
-            ]
-        ]);
+    // Get today's smart alerts count for free users
+    $todayAlertsCount = 0;
+    if (!$user->isPremium()) {
+        $todayAlertsCount = \App\Models\SentimentAlert::where('user_id', $user->id)
+            ->where('last_triggered_at', '>=', now()->startOfDay())
+            ->count();
     }
+
+    $watchlistSummary = $watchlist->map(function ($item) use ($user, $todayAlertsCount) {
+        $crypto = $item->cryptocurrency;
+        $latestAnalysis = $crypto->getLatestTrendAnalysis();
+
+        $data = [
+            'id' => $item->id,
+            'cryptocurrency' => [
+                'id' => $crypto->id,
+                'name' => $crypto->name,
+                'symbol' => $crypto->symbol,
+                'image' => $crypto->image,
+                'coingecko_id' => $crypto->coingecko_id,
+                'current_price_pln' => $crypto->current_price_pln ?? 0,
+                'current_price_usd' => $crypto->current_price_usd ?? 0,
+                'price_change_24h' => $crypto->price_change_24h ?? 0,
+            ],
+            'notifications_enabled' => $item->notifications_enabled,
+        ];
+
+        // Sentiment data dla premium i free (ale z limitami)
+        if ($user->isPremium()) {
+            $data['sentiment_avg'] = $crypto->current_sentiment ?? 0;
+            $data['mention_count'] = $crypto->daily_mentions ?? 0;
+            $data['sentiment_change'] = $crypto->sentiment_change_24h ?? 0;
+            $data['trending_score'] = $crypto->trending_score ?? 0;
+            $data['trending_status'] = $crypto->getTrendingStatus();
+            $data['trend_direction'] = $latestAnalysis?->trend_direction ?? 'neutral';
+            $data['confidence_score'] = $latestAnalysis?->confidence_score ?? 0;
+            $data['emoji'] = $crypto->getSentimentEmoji();
+            $data['analysis_time'] = $crypto->sentiment_updated_at?->diffForHumans() ?? 'Never';
+            $data['has_recent_data'] = $crypto->hasRecentSentimentData(24);
+            $data['todays_analyses_count'] = $crypto->getTodayTrendAnalyses()->count();
+            $data['sentiment_access'] = true;
+            $data['smart_alerts_status'] = 'unlimited';
+        } else {
+            // Free users - limited sentiment data
+            $data['sentiment_avg'] = $crypto->current_sentiment ?? 0;
+            $data['mention_count'] = $crypto->daily_mentions ?? 0;
+            $data['sentiment_change'] = $crypto->sentiment_change_24h ?? 0;
+            $data['trending_score'] = null; // Hidden for free
+            $data['trending_status'] = null;
+            $data['trend_direction'] = $latestAnalysis?->trend_direction ?? 'neutral';
+            $data['confidence_score'] = null; // Hidden for free
+            $data['emoji'] = $crypto->getSentimentEmoji();
+            $data['analysis_time'] = $crypto->sentiment_updated_at?->diffForHumans() ?? 'Never';
+            $data['has_recent_data'] = $crypto->hasRecentSentimentData(24);
+            $data['todays_analyses_count'] = 0;
+            $data['sentiment_access'] = true; // Basic access
+            $data['smart_alerts_status'] = $todayAlertsCount >= 1 ? 'limit_reached' : 'available';
+            $data['today_alerts_count'] = $todayAlertsCount;
+            $data['daily_limit'] = 1;
+        }
+
+        return $data;
+    });
+
+    return response()->json([
+        'watchlist' => $watchlistSummary,
+        'total_count' => $watchlistSummary->count(),
+        'limits' => [
+            'is_premium' => $user->isPremium(),
+            'watchlist_limit' => $user->isPremium() ? null : 5, // Zmienione z 15 na 5
+            'current_count' => $watchlistSummary->count(),
+            'can_add_more' => $user->isPremium() || $watchlistSummary->count() < 5,
+            'sentiment_access' => true, // Wszyscy mają podstawowy dostęp
+            'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla unlimited smart alerts'
+        ],
+        'premium_features' => [
+            'unlimited_watchlist' => $user->isPremium(),
+            'sentiment_tracking' => true, // Wszyscy mają basic
+            'unlimited_smart_alerts' => $user->isPremium(),
+            'trend_analysis' => $user->isPremium(),
+            'ai_insights' => $user->isPremium()
+        ],
+        'smart_alerts_info' => [
+            'is_premium' => $user->isPremium(),
+            'daily_limit' => $user->isPremium() ? null : 1,
+            'today_count' => $todayAlertsCount,
+            'remaining_today' => $user->isPremium() ? null : max(0, 1 - $todayAlertsCount),
+            'status' => $user->isPremium() ? 'unlimited' : ($todayAlertsCount >= 1 ? 'limit_reached' : 'available')
+        ]
+    ]);
+}
 
     /**
      * Add cryptocurrency to watchlist with limits
@@ -107,12 +124,12 @@ class WatchlistController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie limitów przed walidacją
-        if (!$user->isPremium() && $user->watchlist()->count() >= 15) {
+        if (!$user->isPremium() && $user->watchlist()->count() >= 5) {
             return response()->json([
                 'error' => 'Watchlist limit reached',
-                'message' => 'Darmowy plan pozwala na maksymalnie 15 pozycji w watchlist.',
+                'message' => 'Darmowy plan pozwala na maksymalnie 5 pozycji w watchlist.',
                 'upgrade_required' => true,
-                'current_limit' => 15,
+                'current_limit' => 5,
                 'current_count' => $user->watchlist()->count(),
                 'premium_benefits' => [
                     'Nieograniczona watchlist',
