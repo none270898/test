@@ -77,7 +77,7 @@ Route::middleware('auth')->group(function () {
         ->name('verification.send');
     
     Route::get('/dashboard', [DashboardController::class, 'index'])
-        
+        ->middleware('verified')
         ->name('dashboard');
      Route::get('/premium/upgrade', [PaymentController::class, 'showUpgrade'])->name('premium.upgrade');
     
