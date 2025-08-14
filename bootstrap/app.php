@@ -19,9 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'premium' => \App\Http\Middleware\CheckPremium::class,
             'limits' => \App\Http\Middleware\CheckLimits::class, // DODANE
         ]);
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        // $middleware->api(prepend: [
+        //     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        // ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
