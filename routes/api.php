@@ -1,6 +1,7 @@
 <?php
 // routes/api.php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CryptocurrencyController;
 use App\Http\Controllers\DiscoveryController;
 use App\Http\Controllers\PortfolioController;
@@ -14,27 +15,27 @@ Route::middleware(['web', 'auth', 'verified'])->group(function () {
     // User status
     Route::get('user-status', [UserController::class, 'status']);
     Route::put('user-preferences', [UserController::class, 'updatePreferences']);
-    
+
     // Portfolio routes - explicit routes instead of apiResource
     Route::get('portfolio', [PortfolioController::class, 'index']);
     Route::post('portfolio', [PortfolioController::class, 'store']);
     Route::put('portfolio/{holding}', [PortfolioController::class, 'update']);
     Route::delete('portfolio/{holding}', [PortfolioController::class, 'destroy']);
-    
+
     // Price Alerts routes
     Route::get('alerts', [PriceAlertController::class, 'index']);
     Route::post('alerts', [PriceAlertController::class, 'store']);
     Route::put('alerts/{alert}', [PriceAlertController::class, 'update']);
     Route::delete('alerts/{alert}', [PriceAlertController::class, 'destroy']);
     Route::post('alerts/{alert}/toggle', [PriceAlertController::class, 'toggle']);
-    
+
     // Watchlist routes
     Route::get('watchlist', [WatchlistController::class, 'index']);
     Route::post('watchlist', [WatchlistController::class, 'store']);
     Route::put('watchlist/{watchlist}', [WatchlistController::class, 'update']);
     Route::delete('watchlist/{watchlist}', [WatchlistController::class, 'destroy']);
     Route::post('watchlist/bulk-add', [WatchlistController::class, 'bulkAdd']);
-    
+
     // Discovery routes (some require Premium)
     Route::prefix('discovery')->group(function () {
         Route::get('trending', [DiscoveryController::class, 'trending']);
@@ -42,7 +43,7 @@ Route::middleware(['web', 'auth', 'verified'])->group(function () {
         Route::get('stats', [DiscoveryController::class, 'stats'])->middleware('premium');
         Route::get('history/{coinGeckoId}', [DiscoveryController::class, 'history'])->middleware('premium');
     });
-    
+
     // AI Sentiment Analysis routes (Premium only)
     Route::middleware('premium')->prefix('sentiment')->group(function () {
         Route::get('dashboard', [SentimentController::class, 'dashboard']);
@@ -50,8 +51,24 @@ Route::middleware(['web', 'auth', 'verified'])->group(function () {
         Route::get('sources', [SentimentController::class, 'sources']);
         Route::get('search', [SentimentController::class, 'search']);
     });
-    
+
     // Cryptocurrency routes
     Route::get('cryptocurrencies', [CryptocurrencyController::class, 'index']);
     Route::get('cryptocurrencies/search', [CryptocurrencyController::class, 'search']);
+});
+Route::middleware(['web', 'auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    // Dashboard & Stats
+    Route::get('stats', [AdminController::class, 'dashboardStats'])->name('stats');
+    Route::get('system-stats', [AdminController::class, 'systemStats'])->name('system-stats');
+    Route::get('system-logs', [AdminController::class, 'systemLogs'])->name('system-logs');
+
+    // Users Management
+    Route::get('users', [AdminController::class, 'users'])->name('users');
+    Route::get('users/{user}', [AdminController::class, 'userDetails'])->name('users.details');
+    Route::post('users/{user}/toggle-premium', [AdminController::class, 'togglePremium'])->name('users.toggle-premium');
+
+    // Cryptocurrencies Management
+    Route::get('cryptocurrencies', [AdminController::class, 'cryptocurrencies'])->name('cryptocurrencies');
+    Route::get('cryptocurrencies/{cryptocurrency}', [AdminController::class, 'cryptoDetails'])->name('cryptocurrencies.details');
+    Route::put('cryptocurrencies/{cryptocurrency}', [AdminController::class, 'updateCrypto'])->name('cryptocurrencies.update');
 });

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -93,7 +94,7 @@ class Cryptocurrency extends Model
     public function getTrendingStatus(): string
     {
         $score = $this->trending_score ?? 0;
-        
+
         if ($score >= 80) {
             return 'hot';
         } elseif ($score >= 50) {
@@ -111,7 +112,7 @@ class Cryptocurrency extends Model
     public function getSentimentEmoji(): string
     {
         $sentiment = $this->current_sentiment ?? 0;
-        
+
         if ($sentiment > 0.3) {
             return '🚀';
         } elseif ($sentiment > 0.1) {
@@ -130,7 +131,18 @@ class Cryptocurrency extends Model
      */
     public function hasRecentSentimentData(int $hours = 24): bool
     {
-        return $this->sentiment_updated_at && 
-               $this->sentiment_updated_at->isAfter(now()->subHours($hours));
+        return $this->sentiment_updated_at &&
+            $this->sentiment_updated_at->isAfter(now()->subHours($hours));
+    }
+
+    public function watchlists()
+    {
+        return $this->watchlistedBy();
+    }
+    public function watchlistUsers()
+    {
+        return $this->belongsToMany(User::class, 'user_watchlists', 'cryptocurrency_id', 'user_id')
+            ->withPivot('notifications_enabled')
+            ->withTimestamps();
     }
 }

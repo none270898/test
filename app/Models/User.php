@@ -75,8 +75,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isPremium(): bool
     {
-        return $this->premium && 
-               ($this->premium_expires_at === null || $this->premium_expires_at->isFuture());
+        return $this->premium &&
+            ($this->premium_expires_at === null || $this->premium_expires_at->isFuture());
     }
 
     public function getPortfolioValuePln(): float
@@ -98,5 +98,62 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendPasswordResetNotification($token)
     {
         $this->notify(new ResetPasswordNotification($token));
+    }
+
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->is_admin ?? false;
+    }
+
+    /**
+     * Scope for admin users
+     */
+    public function scopeAdmins($query)
+    {
+        return $query->where('is_admin', true);
+    }
+
+    /**
+     * Get user's total portfolio value
+     */
+    public function getPortfolioValueAttribute()
+    {
+        return $this->portfolioHoldings->sum(function ($holding) {
+            return $holding->amount * ($holding->cryptocurrency->current_price ?? 0);
+        });
+    }
+
+    /**
+     * Get user's total invested amount
+     */
+    public function getTotalInvestedAttribute()
+    {
+        return $this->portfolioHoldings->sum(function ($holding) {
+            return $holding->amount * ($holding->average_buy_price ?? 0);
+        });
+    }
+
+    /**
+     * Get user's profit/loss
+     */
+    public function getProfitLossAttribute()
+    {
+        return $this->portfolio_value - $this->total_invested;
+    }
+
+    /**
+     * Get user's profit/loss percentage
+     */
+    public function getProfitLossPercentAttribute()
+    {
+        if ($this->total_invested <= 0) {
+            return 0;
+        }
+
+        return ($this->profit_loss / $this->total_invested) * 100;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -93,7 +94,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/payment/cancel-subscription', [PaymentController::class, 'cancelSubscription'])->name('payment.cancel-subscription');
     });
 });
-
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+});
 Route::get('/', function () {
     return view('welcome');
 })->name('home');

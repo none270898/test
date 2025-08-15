@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'premium' => \App\Http\Middleware\CheckPremium::class,
             'limits' => \App\Http\Middleware\CheckLimits::class, // DODANE
+            'admin' => \App\Http\Middleware\CheckAdmin::class,
         ]);
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,

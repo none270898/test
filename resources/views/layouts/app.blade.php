@@ -3,16 +3,16 @@
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "2b01ec1e-7c15-40ea-965e-a42901074970",
-      safari_web_id: "web.onesignal.auto.458f9dc8-6677-4788-b5a2-9d66a9d7a179",
-      notifyButton: {
-        enable: true,
-      },
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+            appId: "2b01ec1e-7c15-40ea-965e-a42901074970",
+            safari_web_id: "web.onesignal.auto.458f9dc8-6677-4788-b5a2-9d66a9d7a179",
+            notifyButton: {
+                enable: true,
+            },
+        });
     });
-  });
 </script>
 
 <head>
@@ -31,14 +31,19 @@
                     <span class="brand-icon">₿</span>
                     <span class="brand-text">CryptoNote.pl</span>
                 </a>
-                
+
                 <div class="nav-menu">
                     @guest
                         <a href="{{ route('login') }}" class="nav-link">Logowanie</a>
                         <a href="{{ route('register') }}" class="nav-button">Rejestracja</a>
                     @else
                         <a href="{{ route('dashboard') }}" class="nav-link">Dashboard</a>
-                        @if(auth()->user()->isPremium())
+                        @if (auth()->user()->isAdmin())
+                            <a href="{{ route('admin.dashboard') }}" class="nav-link admin-link">
+                                🔧 Admin Panel
+                            </a>
+                        @endif
+                        @if (auth()->user()->isPremium())
                             <span class="premium-badge">Premium</span>
                             <a href="{{ route('payment.billing') }}" class="nav-link">Rozliczenia</a>
                         @else
