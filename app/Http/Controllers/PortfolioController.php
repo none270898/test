@@ -43,11 +43,11 @@ class PortfolioController extends Controller
             ],
             // DODANE: informacje o limitach
             'limits' => [
-                'is_premium' => $user->isPremium(),
-                'portfolio_limit' => $user->isPremium() ? null : 10,
+                'is_premium' => $premium_for_only_test_purpose = 1 ,
+                'portfolio_limit' => $premium_for_only_test_purpose = 1  ? null : 10,
                 'current_count' => $holdings->count(),
-                'can_add_more' => $user->isPremium() || $holdings->count() < 10,
-                'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla nieograniczonego portfolio i zaawansowanych analytics'
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $holdings->count() < 10,
+                'upgrade_message' => $premium_for_only_test_purpose = 1  ? null : 'Upgrade do Premium dla nieograniczonego portfolio i zaawansowanych analytics'
             ]
         ]);
     }
@@ -57,7 +57,7 @@ class PortfolioController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie limitów przed walidacją
-        if (!$user->isPremium() && $user->portfolioHoldings()->count() >= 10) {
+        if (!$premium_for_only_test_purpose = 1  && $user->portfolioHoldings()->count() >= 10) {
             return response()->json([
                 'error' => 'Portfolio limit reached',
                 'message' => 'Darmowy plan pozwala na śledzenie maksymalnie 10 kryptowalut.',
@@ -107,8 +107,8 @@ class PortfolioController extends Controller
                 // DODANE: info o limitach w odpowiedzi
                 'limits_info' => [
                     'current_count' => $user->portfolioHoldings()->count(),
-                    'limit' => $user->isPremium() ? null : 10,
-                    'is_premium' => $user->isPremium()
+                    'limit' => $premium_for_only_test_purpose = 1  ? null : 10,
+                    'is_premium' => $premium_for_only_test_purpose = 1 
                 ]
             ]);
         }
@@ -126,9 +126,9 @@ class PortfolioController extends Controller
             // DODANE: info o limitach w odpowiedzi
             'limits_info' => [
                 'current_count' => $user->portfolioHoldings()->count(),
-                'limit' => $user->isPremium() ? null : 10,
-                'is_premium' => $user->isPremium(),
-                'can_add_more' => $user->isPremium() || $user->portfolioHoldings()->count() < 10
+                'limit' => $premium_for_only_test_purpose = 1  ? null : 10,
+                'is_premium' => $premium_for_only_test_purpose = 1 ,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $user->portfolioHoldings()->count() < 10
             ]
         ], 201);
     }
@@ -172,8 +172,8 @@ class PortfolioController extends Controller
             // DODANE: aktualne info o limitach po usunięciu
             'limits_info' => [
                 'current_count' => $user->portfolioHoldings()->count(),
-                'limit' => $user->isPremium() ? null : 10,
-                'can_add_more' => $user->isPremium() || $user->portfolioHoldings()->count() < 10
+                'limit' => $premium_for_only_test_purpose = 1  ? null : 10,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $user->portfolioHoldings()->count() < 10
             ]
         ]);
     }

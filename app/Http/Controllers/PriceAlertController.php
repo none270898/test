@@ -25,19 +25,19 @@ class PriceAlertController extends Controller
             'alerts' => $alerts,
             // DODANE: informacje o limitach
             'limits' => [
-                'is_premium' => $user->isPremium(),
-                'alerts_limit' => $user->isPremium() ? null : 5,
+                'is_premium' => $premium_for_only_test_purpose = 1 ,
+                'alerts_limit' => $premium_for_only_test_purpose = 1  ? null : 5,
                 'current_active_count' => $activeAlertsCount,
-                'can_add_more' => $user->isPremium() || $activeAlertsCount < 5,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $activeAlertsCount < 5,
                 'total_count' => $alerts->count(),
-                'upgrade_message' => $user->isPremium() ? null : 'Upgrade do Premium dla nieograniczonych alertów + sentiment alerts'
+                'upgrade_message' => $premium_for_only_test_purpose = 1  ? null : 'Upgrade do Premium dla nieograniczonych alertów + sentiment alerts'
             ],
             // DODANE: premium features info
             'premium_features' => [
-                'unlimited_alerts' => $user->isPremium(),
-                'sentiment_alerts' => $user->isPremium(),
-                'push_notifications' => $user->isPremium(),
-                'advanced_conditions' => $user->isPremium()
+                'unlimited_alerts' => $premium_for_only_test_purpose = 1 ,
+                'sentiment_alerts' => $premium_for_only_test_purpose = 1 ,
+                'push_notifications' => $premium_for_only_test_purpose = 1 ,
+                'advanced_conditions' => $premium_for_only_test_purpose = 1 
             ]
         ]);
     }
@@ -49,7 +49,7 @@ class PriceAlertController extends Controller
         // DODANE: Sprawdzenie limitów przed walidacją
         $activeAlertsCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
         
-        if (!$user->isPremium() && $activeAlertsCount >= 5) {
+        if (!$premium_for_only_test_purpose = 1  && $activeAlertsCount >= 5) {
             return response()->json([
                 'error' => 'Alerts limit reached',
                 'message' => 'Darmowy plan pozwala na maksymalnie 5 aktywnych alertów.',
@@ -89,9 +89,9 @@ class PriceAlertController extends Controller
             // DODANE: aktualne info o limitach
             'limits_info' => [
                 'current_active_count' => $newActiveCount,
-                'limit' => $user->isPremium() ? null : 5,
-                'can_add_more' => $user->isPremium() || $newActiveCount < 5,
-                'is_premium' => $user->isPremium()
+                'limit' => $premium_for_only_test_purpose = 1  ? null : 5,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $newActiveCount < 5,
+                'is_premium' => $premium_for_only_test_purpose = 1 
             ]
         ], 201);
     }
@@ -135,8 +135,8 @@ class PriceAlertController extends Controller
             // DODANE: aktualne info o limitach po usunięciu
             'limits_info' => [
                 'current_active_count' => $newActiveCount,
-                'limit' => $user->isPremium() ? null : 5,
-                'can_add_more' => $user->isPremium() || $newActiveCount < 5
+                'limit' => $premium_for_only_test_purpose = 1  ? null : 5,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $newActiveCount < 5
             ]
         ]);
     }
@@ -151,7 +151,7 @@ class PriceAlertController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie limitów gdy włączamy alert
-        if (!$alert->is_active && !$user->isPremium()) {
+        if (!$alert->is_active && !$premium_for_only_test_purpose = 1 ) {
             $activeAlertsCount = $user->priceAlerts()->where('is_active', true)->where('triggered_at', null)->count();
             
             if ($activeAlertsCount >= 5) {
@@ -175,8 +175,8 @@ class PriceAlertController extends Controller
             // DODANE: aktualne info o limitach
             'limits_info' => [
                 'current_active_count' => $newActiveCount,
-                'limit' => $user->isPremium() ? null : 5,
-                'can_add_more' => $user->isPremium() || $newActiveCount < 5
+                'limit' => $premium_for_only_test_purpose = 1  ? null : 5,
+                'can_add_more' => $premium_for_only_test_purpose = 1  || $newActiveCount < 5
             ]
         ]);
     }

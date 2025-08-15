@@ -9,7 +9,7 @@
 
         <div class="pricing-section">
             <div class="pricing-card current">
-                <div class="plan-badge">Aktualny Plan</div>
+                <div class="plan-badge" style="">Darmowy-<span style="text-decoration: line-through">Aktualny Plan</span></div>
                 <h2>Darmowy</h2>
                 <div class="price">0 PLN/miesiąc</div>
 
@@ -26,7 +26,7 @@
             </div>
 
             <div class="pricing-card premium featured">
-                <div class="plan-badge premium">Polecany</div>
+                <div class="plan-badge premium">Aktualny Plan-<span style="text-decoration: line-through">Polecany</span> </div>
                 <h2>Premium</h2>
                 <div class="price">19 PLN<span>/miesiąc</span></div>
 
@@ -152,10 +152,10 @@
                 <div class="testimonial">
                     <p>"AI sentiment z polskich grup to game-changer. Wcześniej śledzenie wszystkiego ręcznie zajmowało
                         godziny."</p>
-                    <span>- Marcin K., trader</span>
+                    <span>C. B</span>
                 </div>
 
-                <div class="testimonial">
+                {{-- <div class="testimonial">
                     <p>"Wreszcie portfolio tracker który rozumie polski rynek. Alerty sentiment uratowały mnie przed
                         stratami."</p>
                     <span>- Anna S., inwestorka</span>
@@ -164,7 +164,7 @@
                 <div class="testimonial">
                     <p>"19 PLN to nic w porównaniu do tego co zyskuję dzięki AI insights. ROI w pierwszym tygodniu."</p>
                     <span>- Tomasz D., hodler</span>
-                </div>
+                </div> --}}
             </div>
         </div>
 

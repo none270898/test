@@ -19,7 +19,7 @@ class CheckLimits
 
         switch ($feature) {
             case 'portfolio':
-                if (!$user->isPremium() && $user->portfolioHoldings()->count() >= 10) {
+                if (!$premium_for_only_test_purpose = 1  && $user->portfolioHoldings()->count() >= 10) {
                     return response()->json([
                         'error' => 'Portfolio limit reached',
                         'message' => 'Darmowy plan pozwala na śledzenie maksymalnie 10 kryptowalut. Upgrade do Premium aby dodać więcej.',
@@ -31,7 +31,7 @@ class CheckLimits
                 break;
                 
             case 'alerts':
-                if (!$user->isPremium() && $user->priceAlerts()->where('is_active', true)->count() >= 5) {
+                if (!$premium_for_only_test_purpose = 1  && $user->priceAlerts()->where('is_active', true)->count() >= 5) {
                     return response()->json([
                         'error' => 'Alerts limit reached',
                         'message' => 'Darmowy plan pozwala na maksymalnie 5 aktywnych alertów. Upgrade do Premium dla nieograniczonych alertów.',
@@ -43,7 +43,7 @@ class CheckLimits
                 break;
                 
             case 'watchlist':
-                if (!$user->isPremium() && $user->watchlist()->count() >= 15) {
+                if (!$premium_for_only_test_purpose = 1  && $user->watchlist()->count() >= 15) {
                     return response()->json([
                         'error' => 'Watchlist limit reached',
                         'message' => 'Darmowy plan pozwala na maksymalnie 15 pozycji w watchlist. Upgrade do Premium dla nieograniczonej watchlist z AI insights.',

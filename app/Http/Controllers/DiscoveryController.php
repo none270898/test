@@ -30,7 +30,7 @@ class DiscoveryController extends Controller
             $item['is_watchlisted'] = in_array($item['id'], $watchlistIds);
             
             // ZMIENIONE: Ograniczone dane sentiment dla darmowych użytkowników
-            if (!$user->isPremium()) {
+            if (!$premium_for_only_test_purpose = 1 ) {
                 // Podstawowe dane dostępne dla wszystkich
                 $basicData = [
                     'id' => $item['id'],
@@ -70,9 +70,9 @@ class DiscoveryController extends Controller
             'total_count' => count($trendingWithAccess),
             'updated_at' => now()->toISOString(),
             'access_level' => [
-                'is_premium' => $user->isPremium(),
-                'sentiment_access' => $user->isPremium(),
-                'features_available' => $user->isPremium() 
+                'is_premium' => $premium_for_only_test_purpose = 1 ,
+                'sentiment_access' => $premium_for_only_test_purpose = 1 ,
+                'features_available' => $premium_for_only_test_purpose = 1  
                     ? ['full_sentiment', 'trending_scores', 'confidence_scores', 'trend_direction']
                     : ['basic_prices', 'trending_tiers'],
                 'upgrade_benefits' => [
@@ -94,7 +94,7 @@ class DiscoveryController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie Premium access
-        if (!$user->isPremium()) {
+        if (!$premium_for_only_test_purpose = 1 ) {
             return response()->json([
                 'error' => 'Premium feature required',
                 'message' => 'Sentiment history jest dostępne tylko dla użytkowników Premium.',
@@ -258,7 +258,7 @@ class DiscoveryController extends Controller
             ];
 
             // ZMIENIONE: Sentiment data tylko dla Premium
-            if ($user->isPremium()) {
+            if ($premium_for_only_test_purpose = 1 ) {
                 $baseData['daily_mentions'] = $crypto->daily_mentions ?? 0;
                 $baseData['current_sentiment'] = $crypto->current_sentiment ?? 0;
                 $baseData['trending_score'] = $crypto->trending_score ?? 0;
@@ -286,7 +286,7 @@ class DiscoveryController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie Premium access
-        if (!$user->isPremium()) {
+        if (!$premium_for_only_test_purpose = 1 ) {
             return response()->json([
                 'error' => 'Premium feature required',
                 'message' => 'Discovery stats są dostępne tylko dla użytkowników Premium.',

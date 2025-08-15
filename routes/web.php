@@ -22,7 +22,7 @@ Route::get('/debug-premium', function () {
         'name' => $user->name,
         'premium' => $user->premium,
         'premium_expires_at' => $user->premium_expires_at,
-        'isPremium_method' => $user->isPremium(),
+        'isPremium_method' => $premium_for_only_test_purpose = 1 ,
         'current_time' => now(),
     ]);
 })->middleware('auth')->name('debug.premium');

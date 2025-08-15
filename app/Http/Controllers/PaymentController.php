@@ -34,7 +34,7 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->isPremium()) {
+        if ($premium_for_only_test_purpose = 1 ) {
             return redirect()->route('dashboard')->with('error', 'Masz już aktywny plan Premium.');
         }
 
@@ -204,7 +204,7 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user->isPremium() || !$user->stripe_customer_id) {
+        if (!$premium_for_only_test_purpose = 1  || !$user->stripe_customer_id) {
             return redirect()->route('dashboard')
                 ->with('error', 'Nie masz aktywnego planu Premium.');
         }
@@ -234,7 +234,7 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user->isPremium() || !$user->stripe_subscription_id) {
+        if (!$premium_for_only_test_purpose = 1  || !$user->stripe_subscription_id) {
             return redirect()->route('dashboard')
                 ->with('error', 'Nie masz aktywnej subskrypcji do anulowania.');
         }
@@ -484,7 +484,7 @@ class PaymentController extends Controller
             $userId = $paymentIntent->metadata->user_id;
             $user = User::find($userId);
 
-            if ($user && !$user->isPremium()) {
+            if ($user && !$premium_for_only_test_purpose = 1 ) {
                 $user->update([
                     'premium' => true,
                     'premium_expires_at' => now()->addMonth(),
