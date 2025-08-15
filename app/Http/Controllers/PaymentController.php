@@ -33,7 +33,7 @@ class PaymentController extends Controller
     public function createCheckoutSession(Request $request)
     {
         $user = Auth::user();
-        
+
         if ($user->isPremium()) {
             return redirect()->route('dashboard')->with('error', 'Masz już aktywny plan Premium.');
         }
@@ -42,43 +42,98 @@ class PaymentController extends Controller
             // Create or get Stripe customer
             $customer = $this->getOrCreateStripeCustomer($user);
 
-            // Create subscription checkout session
-            $session = Session::create([
-                'customer' => $customer->id,
-                'payment_method_types' => ['card', ],//'blik', 'p24'
-                'mode' => 'subscription',
-                'line_items' => [
-                    [
-                        'price_data' => [
-                            'currency' => 'pln',
-                            'product_data' => [
-                                'name' => 'CryptoNote Premium',
-                                'description' => 'Miesięczny dostęp do AI sentiment analysis i funkcji Premium',
+            // POPRAWKA: Payment mode dla obsługi BLIK i P24
+            $mode = $request->get('mode', 'subscription'); // Domyślnie subscription
+
+            if ($mode === 'payment') {
+                // One-time payment mode (obsługuje BLIK, P24)
+                $session = Session::create([
+                    'customer' => $customer->id,
+                    'payment_method_types' => ['card', 'blik', 'p24'], // DODANO BLIK i P24
+                    'mode' => 'payment', // ZMIENIONO na payment
+                    'line_items' => [
+                        [
+                            'price_data' => [
+                                'currency' => 'pln',
+                                'product_data' => [
+                                    'name' => 'CryptoNote Premium - 1 miesiąc',
+                                    'description' => 'Miesięczny dostęp do AI sentiment analysis i funkcji Premium',
+                                ],
+                                'unit_amount' => 1900, // 19.00 PLN in grosze
                             ],
-                            'unit_amount' => 1900, // 19.00 PLN in grosze
-                            'recurring' => [
-                                'interval' => 'month',
+                            'quantity' => 1,
+                        ],
+                    ],
+                    'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url' => route('payment.cancel'),
+                    'metadata' => [
+                        'user_id' => $user->id,
+                        'plan' => 'premium_monthly_onetime',
+                        'mode' => 'payment'
+                    ],
+                    // DODANO: Automatyczne naliczanie VAT dla Polski
+                    'automatic_tax' => [
+                        'enabled' => true,
+                    ],
+                    'customer_update' => [
+                        'address' => 'auto',
+                    ],
+                    // DODANO: Dane firmy dla faktury VAT
+                    'invoice_creation' => [
+                        'enabled' => true,
+                        'invoice_data' => [
+                            'description' => 'CryptoNote Premium - 1 miesiąc',
+                            'metadata' => [
+                                'user_id' => $user->id,
                             ],
                         ],
-                        'quantity' => 1,
                     ],
-                ],
-                'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('payment.cancel'),
-                'metadata' => [
-                    'user_id' => $user->id,
-                    'plan' => 'premium_monthly',
-                ],
-                'subscription_data' => [
+                ]);
+            } else {
+                // Subscription mode (tylko karty, ale z VAT)
+                $session = Session::create([
+                    'customer' => $customer->id,
+                    'payment_method_types' => ['card'], // Tylko karty dla subskrypcji
+                    'mode' => 'subscription',
+                    'line_items' => [
+                        [
+                            'price_data' => [
+                                'currency' => 'pln',
+                                'product_data' => [
+                                    'name' => 'CryptoNote Premium',
+                                    'description' => 'Miesięczny dostęp do AI sentiment analysis i funkcji Premium',
+                                ],
+                                'unit_amount' => 1900, // 19.00 PLN in grosze
+                                'recurring' => [
+                                    'interval' => 'month',
+                                ],
+                            ],
+                            'quantity' => 1,
+                        ],
+                    ],
+                    'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url' => route('payment.cancel'),
                     'metadata' => [
                         'user_id' => $user->id,
                         'plan' => 'premium_monthly',
                     ],
-                ],
-            ]);
+                    'subscription_data' => [
+                        'metadata' => [
+                            'user_id' => $user->id,
+                            'plan' => 'premium_monthly',
+                        ],
+                    ],
+                    // DODANO: Automatyczne naliczanie VAT
+                    'automatic_tax' => [
+                        'enabled' => true,
+                    ],
+                    'customer_update' => [
+                        'address' => 'auto',
+                    ],
+                ]);
+            }
 
             return redirect($session->url);
-
         } catch (\Exception $e) {
             Log::error('Stripe checkout session creation failed', [
                 'user_id' => $user->id,
@@ -90,13 +145,14 @@ class PaymentController extends Controller
         }
     }
 
+
     /**
      * Handle successful payment
      */
     public function success(Request $request)
     {
         $sessionId = $request->query('session_id');
-        
+
         if (!$sessionId) {
             return redirect()->route('dashboard')
                 ->with('error', 'Brak identyfikatora sesji płatności.');
@@ -104,10 +160,10 @@ class PaymentController extends Controller
 
         try {
             $session = Session::retrieve($sessionId);
-            
+
             if ($session->payment_status === 'paid') {
                 $user = Auth::user();
-                
+
                 // Premium will be activated via webhook, but show success page
                 return view('payment.success', [
                     'session' => $session,
@@ -147,7 +203,7 @@ class PaymentController extends Controller
     public function billingPortal()
     {
         $user = Auth::user();
-        
+
         if (!$user->isPremium() || !$user->stripe_customer_id) {
             return redirect()->route('dashboard')
                 ->with('error', 'Nie masz aktywnego planu Premium.');
@@ -160,7 +216,6 @@ class PaymentController extends Controller
             ]);
 
             return redirect($portalSession->url);
-
         } catch (\Exception $e) {
             Log::error('Billing portal creation failed', [
                 'user_id' => $user->id,
@@ -178,7 +233,7 @@ class PaymentController extends Controller
     public function cancelSubscription()
     {
         $user = Auth::user();
-        
+
         if (!$user->isPremium() || !$user->stripe_subscription_id) {
             return redirect()->route('dashboard')
                 ->with('error', 'Nie masz aktywnej subskrypcji do anulowania.');
@@ -191,7 +246,6 @@ class PaymentController extends Controller
 
             return redirect()->route('dashboard')
                 ->with('success', 'Subskrypcja zostanie anulowana na koniec okresu rozliczeniowego.');
-
         } catch (\Exception $e) {
             Log::error('Subscription cancellation failed', [
                 'user_id' => $user->id,
@@ -228,7 +282,7 @@ class PaymentController extends Controller
             case 'customer.subscription.updated':
                 $this->handleSubscriptionUpdated($event->data->object);
                 break;
-            
+
             case 'customer.subscription.deleted':
                 $this->handleSubscriptionDeleted($event->data->object);
                 break;
@@ -239,6 +293,15 @@ class PaymentController extends Controller
 
             case 'invoice.payment_failed':
                 $this->handlePaymentFailed($event->data->object);
+                break;
+
+            // DODANO: Obsługa one-time payments (BLIK/P24)
+            case 'checkout.session.completed':
+                $this->handleCheckoutSessionCompleted($event->data->object);
+                break;
+
+            case 'payment_intent.succeeded':
+                $this->handlePaymentIntentSucceeded($event->data->object);
                 break;
 
             default:
@@ -254,7 +317,7 @@ class PaymentController extends Controller
     private function handleSubscriptionUpdated($subscription)
     {
         $userId = $subscription->metadata->user_id ?? null;
-        
+
         if (!$userId) {
             Log::warning('No user_id in subscription metadata', ['subscription_id' => $subscription->id]);
             return;
@@ -269,7 +332,7 @@ class PaymentController extends Controller
         // Update user premium status
         $user->update([
             'premium' => true,
-            'premium_expires_at' => $subscription->current_period_end ? 
+            'premium_expires_at' => $subscription->current_period_end ?
                 now()->createFromTimestamp($subscription->current_period_end) : null,
             'stripe_customer_id' => $subscription->customer,
             'stripe_subscription_id' => $subscription->id,
@@ -288,7 +351,7 @@ class PaymentController extends Controller
     private function handleSubscriptionDeleted($subscription)
     {
         $user = User::where('stripe_subscription_id', $subscription->id)->first();
-        
+
         if ($user) {
             $user->update([
                 'premium' => false,
@@ -309,10 +372,10 @@ class PaymentController extends Controller
     private function handlePaymentSucceeded($invoice)
     {
         $subscriptionId = $invoice->subscription;
-        
+
         if ($subscriptionId) {
             $user = User::where('stripe_subscription_id', $subscriptionId)->first();
-            
+
             if ($user) {
                 // Extend premium if it was about to expire
                 $subscription = Subscription::retrieve($subscriptionId);
@@ -335,10 +398,10 @@ class PaymentController extends Controller
     private function handlePaymentFailed($invoice)
     {
         $subscriptionId = $invoice->subscription;
-        
+
         if ($subscriptionId) {
             $user = User::where('stripe_subscription_id', $subscriptionId)->first();
-            
+
             if ($user) {
                 Log::warning('Premium payment failed', [
                     'user_id' => $user->id,
@@ -378,5 +441,60 @@ class PaymentController extends Controller
         $user->update(['stripe_customer_id' => $customer->id]);
 
         return $customer;
+    }
+    private function handleOneTimePayment($session)
+    {
+        $userId = $session->metadata->user_id ?? null;
+
+        if (!$userId) {
+            Log::warning('No user_id in session metadata', ['session_id' => $session->id]);
+            return;
+        }
+
+        $user = User::find($userId);
+        if (!$user) {
+            Log::warning('User not found for payment', ['user_id' => $userId]);
+            return;
+        }
+
+        // Aktywuj Premium na miesiąc
+        $user->update([
+            'premium' => true,
+            'premium_expires_at' => now()->addMonth(),
+            'stripe_customer_id' => $session->customer,
+        ]);
+
+        Log::info('One-time premium payment processed', [
+            'user_id' => $user->id,
+            'session_id' => $session->id,
+            'payment_method' => $session->payment_method_types[0] ?? 'unknown'
+        ]);
+    }
+    private function handleCheckoutSessionCompleted($session)
+    {
+        // Sprawdź czy to one-time payment
+        if ($session->mode === 'payment' && isset($session->metadata->mode) && $session->metadata->mode === 'payment') {
+            $this->handleOneTimePayment($session);
+        }
+    }
+    private function handlePaymentIntentSucceeded($paymentIntent)
+    {
+        // Sprawdź metadata czy to premium payment
+        if (isset($paymentIntent->metadata->user_id) && isset($paymentIntent->metadata->plan)) {
+            $userId = $paymentIntent->metadata->user_id;
+            $user = User::find($userId);
+
+            if ($user && !$user->isPremium()) {
+                $user->update([
+                    'premium' => true,
+                    'premium_expires_at' => now()->addMonth(),
+                ]);
+
+                Log::info('Premium activated via payment_intent', [
+                    'user_id' => $user->id,
+                    'payment_intent_id' => $paymentIntent->id
+                ]);
+            }
+        }
     }
 }

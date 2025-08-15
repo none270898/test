@@ -1023,3 +1023,101 @@ body {
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
 }
+.payment-options {
+    margin: 2rem 0;
+}
+
+.payment-options h3 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #1e293b;
+}
+
+.payment-option {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.payment-option:hover {
+    border-color: #6366f1;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.1);
+}
+
+.subscription-option {
+    border-color: #6366f1;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+
+.option-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.option-header h4 {
+    margin: 0;
+    color: #1e293b;
+}
+
+.recommended-badge {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.option-details {
+    margin-bottom: 1.5rem;
+}
+
+.option-details p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.payment-form {
+    margin: 0;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #64748b, #475569);
+    color: white;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #475569, #334155);
+}
+
+@media (max-width: 768px) {
+    .option-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+        text-align: center;
+    }
+}
+.upgrade-form.disabled {
+    text-align: center;
+}
+
+.btn.disabled {
+    background: #d1d5db !important;
+    color: #6b7280 !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn.disabled:hover {
+    background: #d1d5db !important;
+    transform: none !important;
+}
