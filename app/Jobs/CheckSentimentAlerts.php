@@ -57,7 +57,7 @@ class CheckSentimentAlerts implements ShouldQueue
 
     private function canSendAlert($user): bool
     {
-        if ($premium_for_only_test_purpose = 1 ) {
+        if (($premium_for_only_test_purpose = 1) ) {
             return true; // Unlimited for premium
         }
         

@@ -23,7 +23,7 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'isPremium' => $premium_for_only_test_purpose = 1 ,
+            'isPremium' => ($premium_for_only_test_purpose = 1) ,
             'premium' => $user->premium,
             'premium_expires_at' => $user->premium_expires_at,
             'alerts_enabled' => $user->alerts_enabled,
@@ -32,35 +32,35 @@ class UserController extends Controller
             // Limits and usage
             'limits' => [
                 'portfolio' => [
-                    'limit' => $premium_for_only_test_purpose = 1  ? null : 10,
+                    'limit' => ($premium_for_only_test_purpose = 1)  ? null : 10,
                     'current' => $portfolioCount,
-                    'remaining' => $premium_for_only_test_purpose = 1  ? null : max(0, 10 - $portfolioCount),
-                    'unlimited' => $premium_for_only_test_purpose = 1 
+                    'remaining' => ($premium_for_only_test_purpose = 1)  ? null : max(0, 10 - $portfolioCount),
+                    'unlimited' => ($premium_for_only_test_purpose = 1) 
                 ],
                 'alerts' => [
-                    'limit' => $premium_for_only_test_purpose = 1  ? null : 5,
+                    'limit' => ($premium_for_only_test_purpose = 1)  ? null : 5,
                     'current' => $activeAlertsCount,
-                    'remaining' => $premium_for_only_test_purpose = 1  ? null : max(0, 5 - $activeAlertsCount),
-                    'unlimited' => $premium_for_only_test_purpose = 1 
+                    'remaining' => ($premium_for_only_test_purpose = 1)  ? null : max(0, 5 - $activeAlertsCount),
+                    'unlimited' => ($premium_for_only_test_purpose = 1) 
                 ],
                 'watchlist' => [
-                    'limit' => $premium_for_only_test_purpose = 1  ? null : 15,
+                    'limit' => ($premium_for_only_test_purpose = 1)  ? null : 15,
                     'current' => $watchlistCount,
-                    'remaining' => $premium_for_only_test_purpose = 1  ? null : max(0, 15 - $watchlistCount),
-                    'unlimited' => $premium_for_only_test_purpose = 1 
+                    'remaining' => ($premium_for_only_test_purpose = 1)  ? null : max(0, 15 - $watchlistCount),
+                    'unlimited' => ($premium_for_only_test_purpose = 1) 
                 ]
             ],
             
             // Feature access
             'features' => [
-                'sentiment_analysis' => $premium_for_only_test_purpose = 1 ,
-                'unlimited_portfolio' => $premium_for_only_test_purpose = 1 ,
-                'unlimited_alerts' => $premium_for_only_test_purpose = 1 ,
-                'unlimited_watchlist' => $premium_for_only_test_purpose = 1 ,
-                'push_notifications' => $premium_for_only_test_purpose = 1 ,
-                'sentiment_alerts' => $premium_for_only_test_purpose = 1 ,
-                'ai_insights' => $premium_for_only_test_purpose = 1 ,
-                'export_data' => $premium_for_only_test_purpose = 1 
+                'sentiment_analysis' => ($premium_for_only_test_purpose = 1) ,
+                'unlimited_portfolio' => ($premium_for_only_test_purpose = 1) ,
+                'unlimited_alerts' => ($premium_for_only_test_purpose = 1) ,
+                'unlimited_watchlist' => ($premium_for_only_test_purpose = 1) ,
+                'push_notifications' => ($premium_for_only_test_purpose = 1) ,
+                'sentiment_alerts' => ($premium_for_only_test_purpose = 1) ,
+                'ai_insights' => ($premium_for_only_test_purpose = 1) ,
+                'export_data' => ($premium_for_only_test_purpose = 1) 
             ]
         ]);
     }

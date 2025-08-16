@@ -26,7 +26,7 @@ class WatchlistController extends Controller
 
     // Get today's smart alerts count for free users
     $todayAlertsCount = 0;
-    if (!$premium_for_only_test_purpose = 1 ) {
+    if (!($premium_for_only_test_purpose = 1) ) {
         $todayAlertsCount = \App\Models\SentimentAlert::where('user_id', $user->id)
             ->where('last_triggered_at', '>=', now()->startOfDay())
             ->count();
@@ -52,7 +52,7 @@ class WatchlistController extends Controller
         ];
 
         // Sentiment data dla premium i free (ale z limitami)
-        if ($premium_for_only_test_purpose = 1 ) {
+        if (($premium_for_only_test_purpose = 1) ) {
             $data['sentiment_avg'] = $crypto->current_sentiment ?? 0;
             $data['mention_count'] = $crypto->daily_mentions ?? 0;
             $data['sentiment_change'] = $crypto->sentiment_change_24h ?? 0;
@@ -92,26 +92,26 @@ class WatchlistController extends Controller
         'watchlist' => $watchlistSummary,
         'total_count' => $watchlistSummary->count(),
         'limits' => [
-            'is_premium' => $premium_for_only_test_purpose = 1 ,
-            'watchlist_limit' => $premium_for_only_test_purpose = 1  ? null : 5, // Zmienione z 15 na 5
+            'is_premium' => ($premium_for_only_test_purpose = 1) ,
+            'watchlist_limit' => ($premium_for_only_test_purpose = 1)  ? null : 5, // Zmienione z 15 na 5
             'current_count' => $watchlistSummary->count(),
-            'can_add_more' => $premium_for_only_test_purpose = 1  || $watchlistSummary->count() < 5,
+            'can_add_more' => ($premium_for_only_test_purpose = 1)  || $watchlistSummary->count() < 5,
             'sentiment_access' => true, // Wszyscy mają podstawowy dostęp
-            'upgrade_message' => $premium_for_only_test_purpose = 1  ? null : 'Upgrade do Premium dla unlimited smart alerts'
+            'upgrade_message' => ($premium_for_only_test_purpose = 1)  ? null : 'Upgrade do Premium dla unlimited smart alerts'
         ],
         'premium_features' => [
-            'unlimited_watchlist' => $premium_for_only_test_purpose = 1 ,
+            'unlimited_watchlist' => ($premium_for_only_test_purpose = 1) ,
             'sentiment_tracking' => true, // Wszyscy mają basic
-            'unlimited_smart_alerts' => $premium_for_only_test_purpose = 1 ,
-            'trend_analysis' => $premium_for_only_test_purpose = 1 ,
-            'ai_insights' => $premium_for_only_test_purpose = 1 
+            'unlimited_smart_alerts' => ($premium_for_only_test_purpose = 1) ,
+            'trend_analysis' => ($premium_for_only_test_purpose = 1) ,
+            'ai_insights' => ($premium_for_only_test_purpose = 1) 
         ],
         'smart_alerts_info' => [
-            'is_premium' => $premium_for_only_test_purpose = 1 ,
-            'daily_limit' => $premium_for_only_test_purpose = 1  ? null : 1,
+            'is_premium' => ($premium_for_only_test_purpose = 1) ,
+            'daily_limit' => ($premium_for_only_test_purpose = 1)  ? null : 1,
             'today_count' => $todayAlertsCount,
-            'remaining_today' => $premium_for_only_test_purpose = 1  ? null : max(0, 1 - $todayAlertsCount),
-            'status' => $premium_for_only_test_purpose = 1  ? 'unlimited' : ($todayAlertsCount >= 1 ? 'limit_reached' : 'available')
+            'remaining_today' => ($premium_for_only_test_purpose = 1)  ? null : max(0, 1 - $todayAlertsCount),
+            'status' => ($premium_for_only_test_purpose = 1)  ? 'unlimited' : ($todayAlertsCount >= 1 ? 'limit_reached' : 'available')
         ]
     ]);
 }
@@ -124,7 +124,7 @@ class WatchlistController extends Controller
         $user = Auth::user();
         
         // DODANE: Sprawdzenie limitów przed walidacją
-        if (!$premium_for_only_test_purpose = 1  && $user->watchlist()->count() >= 5) {
+        if (!($premium_for_only_test_purpose = 1)  && $user->watchlist()->count() >= 5) {
             return response()->json([
                 'error' => 'Watchlist limit reached',
                 'message' => 'Darmowy plan pozwala na maksymalnie 5 pozycji w watchlist.',
@@ -161,9 +161,9 @@ class WatchlistController extends Controller
             // DODANE: aktualne info o limitach
             'limits_info' => [
                 'current_count' => $newCount,
-                'limit' => $premium_for_only_test_purpose = 1  ? null : 15,
-                'can_add_more' => $premium_for_only_test_purpose = 1  || $newCount < 15,
-                'is_premium' => $premium_for_only_test_purpose = 1 
+                'limit' => ($premium_for_only_test_purpose = 1)  ? null : 15,
+                'can_add_more' => ($premium_for_only_test_purpose = 1)  || $newCount < 15,
+                'is_premium' => ($premium_for_only_test_purpose = 1) 
             ]
         ], $watchlistItem->wasRecentlyCreated ? 201 : 200);
     }
@@ -213,8 +213,8 @@ class WatchlistController extends Controller
             // DODANE: aktualne info o limitach po usunięciu
             'limits_info' => [
                 'current_count' => $newCount,
-                'limit' => $premium_for_only_test_purpose = 1  ? null : 15,
-                'can_add_more' => $premium_for_only_test_purpose = 1  || $newCount < 15
+                'limit' => ($premium_for_only_test_purpose = 1)  ? null : 15,
+                'can_add_more' => ($premium_for_only_test_purpose = 1)  || $newCount < 15
             ]
         ]);
     }
@@ -237,7 +237,7 @@ class WatchlistController extends Controller
         $newTotalCount = $currentCount + $requestedCount;
 
         // DODANE: Sprawdzenie limitów dla bulk add
-        if (!$premium_for_only_test_purpose = 1  && $newTotalCount > 15) {
+        if (!($premium_for_only_test_purpose = 1)  && $newTotalCount > 15) {
             $availableSlots = max(0, 15 - $currentCount);
             
             return response()->json([
@@ -275,8 +275,8 @@ class WatchlistController extends Controller
             // DODANE: aktualne info o limitach
             'limits_info' => [
                 'current_count' => $finalCount,
-                'limit' => $premium_for_only_test_purpose = 1  ? null : 15,
-                'can_add_more' => $premium_for_only_test_purpose = 1  || $finalCount < 15
+                'limit' => ($premium_for_only_test_purpose = 1)  ? null : 15,
+                'can_add_more' => ($premium_for_only_test_purpose = 1)  || $finalCount < 15
             ]
         ]);
     }
